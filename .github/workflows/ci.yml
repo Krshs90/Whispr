@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+  security-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for private files
+        run: |
+          if git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E "README_PRIVATE\.md|TODO\.md|IDEAS\.md|\.env$"; then
+            echo "❌ Private file detected in commit. Do not commit private documentation."
+            exit 1
+          fi
+          echo "✅ No private files found."
+
+      - name: Scan for hardcoded secrets
+        run: |
+          # Check for common secret patterns in source files
+          if grep -rE "(sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|AIza[0-9A-Za-z\-_]{35}|Bearer [a-zA-Z0-9_\-\.]{40,})" \
+            --include="*.js" --include="*.ts" --include="*.tsx" --include="*.json" \
+            --exclude-dir=node_modules --exclude-dir=dist --exclude="package-lock.json" \
+            . ; then
+            echo "❌ Potential hardcoded secret detected. Review the output above."
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets found."
