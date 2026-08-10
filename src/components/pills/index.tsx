@@ -44,7 +44,7 @@ export const PILL_REGISTRY: PillEntry[] = [
   { ...recordingPillMeta, component: RecordingPill },
   { ...musicPillMeta, component: MusicPill },
   { ...directionsPillMeta, component: DirectionsPill },
-  { ...notificationPillMeta, component: (props) => <NotificationPill app="Gmail" message="Meeting notes from Sarah Chen" iconUrl="https://logo.clearbit.com/gmail.com" {...props} /> },
+  { ...notificationPillMeta, component: NotificationPill },
   { ...clockPillMeta, component: ClockPill },
   { ...connectivityPillMeta, component: ConnectivityPill },
   { ...tasksPillMeta, component: TasksPill },

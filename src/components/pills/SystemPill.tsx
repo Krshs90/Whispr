@@ -38,8 +38,23 @@ export function SystemPill({ data, defaultExpanded: _defaultExpanded = false }: 
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
               <span style={{ fontWeight: 600 }}>CPU ({sys.cpuCores} Cores)</span>
-              <span style={{ color: '#4ADE80', fontVariantNumeric: 'tabular-nums' }}>Active</span>
+              <span style={{
+                color: sys.cpuPercent > 80 ? '#FF3B30' : sys.cpuPercent > 50 ? '#FF8C00' : '#4ADE80',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {sys.cpuPercent !== undefined ? `${sys.cpuPercent}%` : '—'}
+              </span>
             </div>
+            {sys.cpuPercent !== undefined && (
+              <div style={{ width: '100%', height: 6, background: '#2A2A2A', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${sys.cpuPercent}%` }}
+                  style={{ height: '100%', background: sys.cpuPercent > 80 ? '#FF3B30' : sys.cpuPercent > 50 ? '#FF8C00' : '#4ADE80', borderRadius: 3 }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                />
+              </div>
+            )}
             <div style={{ fontSize: 11, color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {sys.cpuModel}
             </div>

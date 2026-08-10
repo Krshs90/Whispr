@@ -1,5 +1,6 @@
 import { OLLAMA_HOST, getAvailableModels } from './ollamaManager.js';
 import { availableTools, executeDynamicTool, sanitizeToolArgs } from './tools.js';
+import { classifyWithML } from './classifier.js';
 
 /**
  * Handles the communication with Local Ollama. 
@@ -48,7 +49,9 @@ const DIRECT_WIDGET_MAP = [
   { patterns: ['currency converter', 'convert currency', 'currency exchange', 'currency widget', 'exchange rate'], tool: 'get_currency', args: {} },
   { patterns: ['calendar widget', 'open calendar', 'show calendar', 'my schedule'], tool: 'get_calendar', args: {} },
   { patterns: ['translate widget', 'open translator', 'show translator', 'translation widget'], tool: 'get_translation', args: {} },
-  { patterns: ['tasks widget', 'open tasks', 'show tasks', 'my tasks', 'todo list', 'checklist'], tool: 'get_tasks', args: {} }
+  { patterns: ['tasks widget', 'open tasks', 'show tasks', 'my tasks', 'todo list', 'checklist'], tool: 'get_tasks', args: {} },
+  { patterns: ['stocks widget', 'stock widget', 'open stocks', 'show stocks', 'stock market widget'], tool: 'get_stocks', args: { query: 'SPY' } },
+  { patterns: ['news widget', 'open news', 'show news', 'latest news', 'breaking news', 'top headlines'], tool: 'get_news', args: {} },
 ];
 
 // ─── Sports Keyword Detector ───
@@ -79,7 +82,7 @@ const SPORTS_KEYWORDS = [
   // Generic sports terms
   'score', 'game score', 'game today', 'latest game', 'last game', 'match score', 'match today',
   'standings', 'playoff', 'championship', 'super bowl', 'world series', 'world cup', 'finals',
-  'season record', 'win loss', 'who won', 'who plays', 'next game',
+  'season record', 'win loss', 'who won', 'who plays', 'next game', 'football', 'basketball', 'baseball', 'nfl', 'nba', 'mlb', 'nhl', 'soccer', 'sports game'
 ];
 
 function detectSportsQuery(msg) {
@@ -158,6 +161,10 @@ async function classifyIntent(userMessage, routerModel) {
     { intent: 'GREETING', pattern: /^(hi|hello|hey|yo|sup|thanks|thank you|bye|goodbye|how are you|good morning|good night)[\s.!?]*$/ },
     { intent: 'TOOL', pattern: /^(what is the|what's the|show me the|current|check the|latest|breaking)[\s.!?]*(weather|forecast|temperature|score|game|news|headlines|stock|price of)\b/ },
     { intent: 'TOOL', pattern: /\b(play music|play song|on spotify)\b/ },
+    // Stock queries: ticker symbols (ALL CAPS 1-5 letters), or company name + stock/price/share context
+    { intent: 'TOOL', pattern: /\b([A-Z]{1,5})\b.*(stock|share|price|trading|ticker|market)/ },
+    { intent: 'TOOL', pattern: /(stock price|share price|stock quote|how is .* (stock|doing|trading)|what is .* (stock|price)|price of .* (stock|share)|(aapl|tsla|googl|goog|msft|amzn|nvda|meta|nflx|spy|qqq|baba|amd|intc|brk|jpm|dis|nike|v|ma|pypl|coin|pltr|rivn|lcid|sofi|abnb|uber|lyft|snap|pins|twtr|hood|gme|amc|bb|nok)\b)/i },
+    { intent: 'TOOL', pattern: /\b(news|headlines|top stories|breaking)\b/ },
     { intent: 'VISION', pattern: /\b(what is on my screen|what's on my screen|can you see my screen|look at my screen|screen|vision)\b/ },
     { intent: 'MATH', pattern: /^(calculate|solve|graph|plot|what is)\b.*[0-9+*/=-]/ },
     { intent: 'CODE', pattern: /^(write a|how to|fix this|debug this)\b.*(script|code|function|api|javascript|python)/ },
@@ -171,48 +178,14 @@ async function classifyIntent(userMessage, routerModel) {
     }
   }
 
-  // 2. SLOW PASS: LLM Fallback for ambiguous queries
-  console.log(`[AI Router] Falling back to LLM classification...`);
-  const prompt = `You are a high-speed message classifier. Classify the user's message into exactly ONE of these categories:
-GREETING — casual hi, thanks, bye, how are you, small talk
-TOOL — needs LIVE or CURRENT data: weather forecast, sports scores/games/teams, stock prices, playing music, news. ANY question about a specific sports team (e.g. Cowboys, Lakers, Yankees) or asking for a score/game result is ALWAYS TOOL.
-CODE — writing, debugging, or explaining code, programming, APIs, software development (if the user asks to "graph" or "plot" an equation, or explicitly asks for "LaTeX", IT IS MATH, NOT CODE)
-MATH — solving equations, algebra, calculus, arithmetic, statistics, proofs, mathematical reasoning, graphing or plotting math equations, or formatting equations in LaTeX
-TRANSLATION — translating words/sentences/text from one language to another, asking "how do you say X in Y"
-HISTORY — questions about historical events, historical figures, wars, civilizations, historical analysis
-SCIENCE — physics, chemistry, biology, astronomy, earth science, medical science questions
-BUSINESS — economics, finance theory, marketing, management, entrepreneurship, business strategy
-ENGINEERING — mechanical, electrical, civil, aerospace engineering, materials science, CAD
-GAMING — video games, esports, game mechanics, game development, gaming hardware
-COMPLEX — deep philosophical analysis, essays, creative writing, multi-part comparisons, debates
-STANDARD — general simple questions, opinions, recommendations, everyday knowledge
-
-Respond with ONLY the raw category name. No explanation. No punctuation.
-User message: "${userMessage}"`;
-
-  try {
-    const response = await fetch(`${OLLAMA_HOST}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: routerModel,
-        prompt: prompt,
-        stream: false,
-        options: { temperature: 0, num_ctx: 512, num_predict: 10 }
-      })
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const output = (data.response || '').trim().toUpperCase();
-      
-      const validCategories = ['GREETING', 'TOOL', 'CODE', 'COMPLEX', 'STANDARD', 'MATH', 'TRANSLATION', 'HISTORY', 'SCIENCE', 'BUSINESS', 'ENGINEERING', 'GAMING'];
-      const matched = validCategories.find(c => output.includes(c));
-      if (matched) return matched;
-    }
-  } catch (e) {
-    console.error("[AI Router] Failed to classify, falling back to STANDARD.", e.message);
+  // 2. ML PASS: Local Naive Bayes Classification
+  console.log(`[AI Router] Falling back to local ML classifier...`);
+  const mlIntent = classifyWithML(userMessage);
+  if (mlIntent) {
+    console.log(`[AI Router] ML Classifier matched: ${mlIntent}`);
+    return mlIntent;
   }
+  
   return 'STANDARD';
 }
 
@@ -593,9 +566,16 @@ User request: "${lastUserMsg}"`;
             toolCallsBuf = toolCallsBuf.concat(data.message.tool_calls);
           }
           if (data.message.content) {
-            assistantContentBuf += data.message.content;
-            tokenCount++;
-            onToken(data.message.content);
+            let chunk = data.message.content;
+            if (tokenCount === 0) {
+              chunk = chunk.replace(/^assistant\s*/i, '');
+              chunk = chunk.replace(/^assistant\n*/i, '');
+            }
+            if (chunk) {
+              assistantContentBuf += chunk;
+              tokenCount++;
+              onToken(chunk);
+            }
             
             // Trigger slow warning if speed is < 5 tokens/sec after 8 seconds
             if (!slowWarningSent && tokenCount > 0) {
@@ -615,14 +595,16 @@ User request: "${lastUserMsg}"`;
     }
 
     // --- Hallucination Recovery ---
-    if (toolCallsBuf.length === 0 && assistantContentBuf.trim().startsWith('{') && assistantContentBuf.includes('"name"')) {
+    if (toolCallsBuf.length === 0 && assistantContentBuf.includes('{') && assistantContentBuf.includes('"name"')) {
       try {
-        const fakeTool = JSON.parse(assistantContentBuf.substring(assistantContentBuf.indexOf('{'), assistantContentBuf.lastIndexOf('}') + 1));
-        if (fakeTool.name) {
+        const fakeToolStr = assistantContentBuf.substring(assistantContentBuf.indexOf('{'), assistantContentBuf.lastIndexOf('}') + 1);
+        const fakeTool = JSON.parse(fakeToolStr);
+        const toolObj = fakeTool.function || fakeTool;
+        if (toolObj.name) {
           toolCallsBuf.push({
             function: {
-              name: fakeTool.name,
-              arguments: fakeTool.parameters || fakeTool.arguments || {}
+              name: toolObj.name,
+              arguments: toolObj.parameters || toolObj.arguments || toolObj.param || {}
             }
           });
           assistantContentBuf = "";
@@ -654,8 +636,8 @@ User request: "${lastUserMsg}"`;
 
       const isError = toolResultStr.includes('"error"');
       const followUpPrompt = isError
-        ? `SYSTEM LOG: You attempted to execute the '${toolName}' tool but it FAILED or returned NO DATA with this message: ${toolResultStr}. If the error suggests using a fallback tool (like search_web), YOU MUST USE THAT TOOL NOW. Otherwise, briefly inform the user that you couldn't complete the action without apologizing.`
-        : `SYSTEM LOG: You successfully executed the '${toolName}' tool and the widget is now visible to the user. The tool returned: ${toolResultStr}. Briefly state that you did it organically in 1 sentence. DO NOT apologize or state your limitations. DO NOT output any raw JSON or code.`;
+        ? `SYSTEM LOG: You attempted to execute the '${toolName}' tool but it FAILED with this message: ${toolResultStr}. If the error suggests using a fallback tool (like search_web), use it. Otherwise, briefly apologize and say you couldn't find the information.`
+        : `SYSTEM LOG: You successfully executed the '${toolName}' tool and the widget is now visible to the user on their screen. The tool returned this data: ${toolResultStr}. Respond naturally and briefly (1 sentence) confirming you found the information. Do NOT say 'the user can find', speak directly to the user (e.g. 'Here is the score!'). DO NOT output raw JSON.`;
 
       formattedMessages.push({
         role: 'system',

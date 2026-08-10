@@ -256,7 +256,7 @@ export function SportsPill({ data, defaultExpanded = false, onExpand }: { data?:
 
       {/* Header */}
       <div style={{ fontSize: 13, fontWeight: 600, color: '#A0A0A5', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 8 }}>
-        {allGames.length > 1 ? `Today's Games` : 'Game Details'}
+        {allGames.length > 1 ? `Matchups` : 'Game Details'}
       </div>
 
       {/* Render all games */}

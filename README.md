@@ -56,8 +56,8 @@ Everything runs **100% locally** on your machine via [Ollama](https://ollama.ai)
 | 🏀 **Sports** | ✅ Working | ESPN public API | Scores, live, standings |
 | 📈 **Stocks** | ⚠️ Partial | Yahoo Finance scraping | Intermittently blocked by Yahoo |
 | 📰 **News** | ✅ Working | Google News RSS | Top headlines |
-| 🎵 **Music** | ⚠️ Windows Only | Windows PowerShell / SMTC | Detect-only, no playback |
-| 🧮 **Calculator** | ⚠️ Needs Work | Local `new Function()` eval | Missing keyboard input, bad UX |
+| 🎵 **Music** | ✅ Working | Windows PowerShell / Native URIs | Detection + Playback via native apps/web |
+| 🧮 **Calculator** | ✅ Working | Local `mathjs` eval | Keyboard input, history, and graphing support |
 | 💱 **Currency** | ✅ Working | `fawazahmed0/currency-api` | No key needed |
 | 🖥 **System Monitor** | ⚠️ No CPU % | Node.js `os` module | Shows static CPU info, no live usage |
 | 🌍 **Translation** | 🔴 UI Shell | LLM only | No real translation API wired |
@@ -79,30 +79,7 @@ Everything runs **100% locally** on your machine via [Ollama](https://ollama.ai)
 - **Settings panel** with 9 tabs — AI Models, Services (API keys), Widgets Index, Shortcuts, and more
 - Context memory bar showing token usage
 
-<br/>
 
-## ✦ Known Issues
-
-The following are confirmed bugs or major missing features. See [GitHub Issues](https://github.com/Krshs90/Whispr/issues) for the full list.
-
-| # | Issue | Severity |
-|---|-------|----------|
-| Renderer crash on startup | App loops with `render-process-gone` errors on some machines | 🔴 Critical |
-| Stocks broken | Yahoo Finance scraping gets blocked, returns stale/no data | 🔴 High |
-| Calculator UX poor | No keyboard input, no history, buttons look generic | 🟡 Medium |
-| System Monitor | Shows static CPU model name, no live CPU % or real-time graphs | 🟡 Medium |
-| Tasks widget | No AI-add ("add buy milk to my tasks"), no delete, no sync | 🟡 Medium |
-| Translation widget | UI shell only — no actual API for translation | 🔴 High |
-| Timer | Buttons exist but timer doesn't actually tick | 🟡 Medium |
-| DuckDuckGo scraping | HTML regex fragile, breaks when DDG changes layout | 🔴 High |
-| Whispr Vision | Screen capture infrastructure exists but AI pipeline not complete | 🔴 High |
-| Image upload | No image upload support for AI vision queries | 🟡 Medium |
-| Music playback | Detection works, but "play Blinding Lights" doesn't actually play | 🟡 Medium |
-| No production build | No `electron-builder` packaging, no installer | 🟡 Medium |
-| Theme toggle | Dark/light setting exists in UI but does nothing | 🟡 Medium |
-| macOS / Linux | PowerShell media detection Windows-only; not tested on other platforms | 🟡 Medium |
-
-<br/>
 
 ## ✦ Getting Started
 
@@ -240,13 +217,14 @@ Quick summary:
 Top priorities for contributors:
 
 - [ ] Fix Stocks widget — replace Yahoo Finance scraping with reliable API
-- [ ] Fix Calculator — add keyboard input, history, proper expression parser
+- [x] Fix Calculator — add keyboard input, history, proper expression parser
 - [ ] Fix System Monitor — add live CPU %, GPU, network graphs
 - [ ] Implement Translation — wire MyMemory or LibreTranslate API
 - [ ] Implement Timer — countdown logic + desktop notification
 - [ ] Implement Whispr Vision — screen capture → vision model pipeline
 - [ ] Image upload — allow sending images to AI for analysis
 - [ ] Cross-platform media detection — replace Windows PowerShell
+- [x] Music Playback - Native desktop/web launching for Spotify, Apple Music, etc.
 - [ ] Production packaging — `electron-builder` installer
 - [ ] Replace DuckDuckGo HTML scraping — use SearXNG or Brave Search API
 - [ ] Dark/light theme — CSS custom properties system

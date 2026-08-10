@@ -44,13 +44,18 @@ export let availableTools = [
     type: "function",
     function: {
       name: "play_music",
-      description: "Play a specific song, artist, or playlist on Spotify. If the user just asks what is playing or wants to see the music widget, call with an empty song or 'Now Playing'. Do NOT pass 'null' as the song value.",
+      description: "Play a specific song, artist, or playlist on a streaming platform. If the user just asks what is playing, call with an empty song.",
       parameters: {
         type: "object",
         properties: {
           song: {
             type: "string",
-            description: "Name of the song, artist, or playlist to play. Leave empty or use 'Now Playing' to just check what is currently playing."
+            description: "Name of the song, artist, or playlist to play."
+          },
+          platform: {
+            type: "string",
+            description: "The streaming platform to use. Defaults to 'spotify'.",
+            enum: ["spotify", "apple", "youtube", "soundcloud"]
           }
         },
         required: []
@@ -75,11 +80,11 @@ export let availableTools = [
           },
           status: {
             type: "string",
-            description: "Filter by match status: 'live', 'past' (for latest/last games), 'upcoming' (for future scheduled games), or 'all'. Defaults to 'all'.",
+            description: "Filter by match status: 'live', 'past' (for latest/last/previous games), 'upcoming' (for future scheduled games). You MUST pick one.",
             enum: ["live", "past", "upcoming", "all"]
           }
         },
-        required: []
+        required: ["status"]
       }
     }
   },
@@ -338,12 +343,39 @@ export async function executeTool(name, rawArgs, apiKeys = {}) {
       let nowPlaying = null;
       const { detectNowPlaying, controlMedia } = await import('./mediaDetector.js');
       
+      const platform = (args.platform || 'spotify').toLowerCase();
+
       // Check for commands
       if (['play', 'pause', 'next', 'skip', 'prev', 'previous'].includes(songLower)) {
         let action = songLower;
         if (action === 'skip') action = 'next';
         if (action === 'previous') action = 'prev';
         nowPlaying = await controlMedia(action);
+      } else if (rawSong && songLower !== 'now playing') {
+        // Trigger external app search/playback
+        const encoded = encodeURIComponent(rawSong);
+        if (platform === 'spotify') {
+          // Launch native Spotify app directly
+          execPromise(`start spotify:search:${encoded}`).catch(() => {});
+        } else if (platform === 'apple') {
+          // Launch Apple Music
+          const { shell } = require('electron');
+          shell.openExternal(`https://music.apple.com/search?term=${encoded}`);
+        } else if (platform === 'youtube') {
+          // Launch YouTube Music
+          const { shell } = require('electron');
+          shell.openExternal(`https://music.youtube.com/search?q=${encoded}`);
+        } else if (platform === 'soundcloud') {
+          // Launch SoundCloud
+          const { shell } = require('electron');
+          shell.openExternal(`https://soundcloud.com/search?q=${encoded}`);
+        }
+        
+        return JSON.stringify({
+          status: "success",
+          action: `Launched ${platform} to search and play '${rawSong}'.`,
+          platform: platform
+        });
       } else {
         nowPlaying = await detectNowPlaying();
       }
@@ -707,9 +739,30 @@ export async function executeTool(name, rawArgs, apiKeys = {}) {
     const freeMem = os.freemem();
     const usedMem = totalMem - freeMem;
     const cpuCount = os.cpus().length;
-    // Simple average CPU approximation
     const sysUptime = os.uptime();
-    
+
+    // Measure real CPU usage: compare two snapshots 500ms apart
+    function getCpuTimes() {
+      return os.cpus().map(cpu => ({
+        idle: cpu.times.idle,
+        total: Object.values(cpu.times).reduce((a, b) => a + b, 0)
+      }));
+    }
+    const t1 = getCpuTimes();
+    const cpuPercent = await new Promise((resolve) => {
+      setTimeout(() => {
+        const t2 = getCpuTimes();
+        let totalIdle = 0, totalWork = 0;
+        for (let i = 0; i < t1.length; i++) {
+          const idleDiff = t2[i].idle - t1[i].idle;
+          const totalDiff = t2[i].total - t1[i].total;
+          totalIdle += idleDiff;
+          totalWork += totalDiff;
+        }
+        resolve(totalWork === 0 ? 0 : Math.round((1 - totalIdle / totalWork) * 100));
+      }, 500);
+    });
+
     return JSON.stringify({
       status: "success",
       action: "System health diagnostic complete.",
@@ -718,6 +771,7 @@ export async function executeTool(name, rawArgs, apiKeys = {}) {
         arch: os.arch(),
         cpuCores: cpuCount,
         cpuModel: os.cpus()[0].model,
+        cpuPercent: cpuPercent,
         totalMemGB: (totalMem / 1024 ** 3).toFixed(2),
         usedMemGB: (usedMem / 1024 ** 3).toFixed(2),
         freeMemGB: (freeMem / 1024 ** 3).toFixed(2),
@@ -793,14 +847,10 @@ export async function executeTool(name, rawArgs, apiKeys = {}) {
   }
 
   if (name === "get_flights") {
-    // Flight status placeholder widget
+    // Flight tracking is not yet implemented — return honest error so LLM doesn't lie to user
     return JSON.stringify({
-      flightNumber: args.flightNumber || "Unknown",
-      status: "In Air",
-      origin: "JFK",
-      destination: "LAX",
-      altitude: "35,000 ft",
-      speed: "520 mph"
+      error: "Flight tracking is not yet supported in this version of Whispr.",
+      message: "Inform the user that real-time flight status is not yet available. Suggest they check FlightAware.com or the airline's website directly. Do NOT make up any flight data."
     });
   }
 

@@ -1,37 +1,36 @@
-import { motion } from 'framer-motion';
-import { Plane } from 'lucide-react';
-import { PillLayout } from './PillLayout';
+import { Plane, AlertCircle } from 'lucide-react';
 
 export function FlightPill() {
   return (
-    <PillLayout height={80}>
-      <div style={{ width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Plane size={14} color="#FF9500" />
-            <span style={{ fontSize: 11, color: '#FF9500', fontWeight: 600 }}>AA 1001</span>
-            <span style={{ marginLeft: 6, fontSize: 8, background: '#FF950020', color: '#FF9500', padding: '2px 6px', borderRadius: 4, fontWeight: 700, textTransform: 'uppercase' }}>Coming Soon</span>
-          </div>
-          <span style={{ fontSize: 10, color: '#4ADE80', fontWeight: 600 }}>On Time</span>
+    <div style={{
+      width: '100%',
+      background: '#1C1C1E',
+      padding: '16px 18px',
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      boxSizing: 'border-box', borderRadius: 14,
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+        background: '#FF950018', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Plane size={15} color="#FF9500" />
+      </div>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#F5F5EB', marginBottom: 4 }}>
+          Flight Tracking
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#FFFFEB' }}>SFO</div>
-            <div style={{ fontSize: 10, color: '#888' }}>10:26 AM</div>
-          </div>
-          <div style={{ flex: 1, margin: '0 12px', position: 'relative', height: 2 }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#2A2A2A', borderRadius: 1 }} />
-            <motion.div animate={{ left: ['20%', '65%'] }} transition={{ duration: 10, repeat: Infinity, ease: 'linear' }} style={{ position: 'absolute', top: -4, width: 10, height: 10 }}>
-              <Plane size={10} color="#FFFFEB" style={{ transform: 'rotate(90deg)' }} />
-            </motion.div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#FFFFEB' }}>JFK</div>
-            <div style={{ fontSize: 10, color: '#888' }}>4:45 PM</div>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+          <AlertCircle size={11} color="#FF8C00" />
+          <span style={{ fontSize: 11, color: '#FF8C00', fontWeight: 600 }}>Not yet supported</span>
+        </div>
+        <div style={{ fontSize: 11, color: '#6A6A70', lineHeight: 1.5 }}>
+          Real-time flight status (FlightAware / AeroAPI) is coming in a future update.
+          Try asking Whispr to search for your flight instead.
         </div>
       </div>
-    </PillLayout>
+    </div>
   );
 }
-export const flightPillMeta = { name: 'Flight', height: 80, keywords: ['flight', 'track flight', 'airline'] };
+
+export const flightPillMeta = { name: 'Flight', height: 100, keywords: ['flight', 'track flight', 'airline'] };
+

@@ -664,11 +664,11 @@ function MainApp() {
               <MessageSquare size={18} />
             </button>
           )}
+          <button onClick={() => setView('library')} style={{ ...styles.iconBtn, ...(view === 'library' ? styles.iconBtnActive : {}), WebkitAppRegion: 'no-drag' } as React.CSSProperties} title="Library">
+            <BookOpen size={18} />
+          </button>
           <span style={styles.topBarTitle}>{activeSession?.title || 'Whispr'}</span>
           <div style={{ flex: 1 }} />
-          <button style={{ ...styles.iconBtn, WebkitAppRegion: 'no-drag' } as React.CSSProperties} title="Search chats">
-            <Search size={18} />
-          </button>
           <div style={{ display: 'flex', gap: 2, marginLeft: 8, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <button onClick={() => window.electronAPI?.minimizeWindow()} style={{ ...styles.winBtn }} title="Minimize"
               onMouseEnter={e => e.currentTarget.style.background = '#31312F'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>

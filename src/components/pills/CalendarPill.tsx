@@ -1,53 +1,90 @@
-import { Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar as CalendarIcon, Clock, AlertCircle } from 'lucide-react';
 
 export function CalendarPill() {
-  const events = [
-    { title: 'Project Sync', time: '10:00 AM', color: '#4ADE80' },
-    { title: 'Lunch w/ Team', time: '12:30 PM', color: '#6A6A70' },
-    { title: 'Design Review', time: '3:00 PM', color: '#3178C6' }
-  ];
+  const [now, setNow] = useState(new Date());
+
+  // Live clock tick
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+  const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  // Day grid for the current month
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay(); // 0=Sun
+  const today = now.getDate();
+
+  const cells: (number | null)[] = [...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  // Pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
   return (
     <div style={{
       width: '100%',
       background: '#1A1A1A',
-      padding: '20px',
+      padding: '16px 18px 18px',
       display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
-      borderRadius: 16, border: '1px solid #2A2A2A',
+      borderRadius: 16,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: 8,
-          background: '#4ADE8022', display: 'flex', justifyContent: 'center', alignItems: 'center',
-          flexShrink: 0,
-        }}>
-          <CalendarIcon size={16} color="#4ADE80" />
+      {/* Header: date + time */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 11, color: '#6A6A70', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dayName}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#F5F5EB' }}>{dateStr}</div>
         </div>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#A0A0A5', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Schedule
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#6A6A70', fontSize: 12 }}>
+          <Clock size={12} />
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{timeStr}</span>
+        </div>
       </div>
 
-      <div style={{ borderLeft: '2px solid #2A2A2A', paddingLeft: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {events.map((ev, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: ev.color }} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#FFFFEB' }}>{ev.title}</span>
+      {/* Mini calendar grid */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+          {DOW.map(d => (
+            <div key={d} style={{ textAlign: 'center', fontSize: 9, color: '#555', fontWeight: 700, padding: '2px 0' }}>{d}</div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+          {cells.map((day, i) => (
+            <div key={i} style={{
+              textAlign: 'center', fontSize: 11,
+              borderRadius: 6, padding: '4px 2px',
+              background: day === today ? '#4ADE80' : 'transparent',
+              color: day === today ? '#111' : day ? '#A0A0A5' : 'transparent',
+              fontWeight: day === today ? 700 : 400,
+            }}>
+              {day ?? ''}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#6A6A70', fontSize: 11, paddingLeft: 14 }}>
-              <Clock size={10} />
-              <span>{ev.time}</span>
-            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Honest empty state */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-start', gap: 8,
+        background: '#22222A', borderRadius: 10, padding: '10px 12px',
+      }}>
+        <AlertCircle size={14} color="#FF8C00" style={{ flexShrink: 0, marginTop: 1 }} />
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#FF8C00', marginBottom: 2 }}>Calendar not connected</div>
+          <div style={{ fontSize: 10, color: '#6A6A70', lineHeight: 1.5 }}>
+            Google Calendar / iCal sync is coming in a future update. Your events will appear here once connected.
           </div>
-        ))}
-      </div>
-
-      <div style={{ marginTop: 24, fontSize: 11, color: '#555', textAlign: 'center' }}>
-        Live connecting in development
+        </div>
       </div>
     </div>
   );
 }
 
-export const calendarPillMeta = { name: 'Calendar', height: 260, keywords: ['calendar', 'schedule', 'events'] };
+export const calendarPillMeta = { name: 'Calendar', height: 360, keywords: ['calendar', 'schedule', 'events'] };
+

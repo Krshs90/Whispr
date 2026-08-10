@@ -1,26 +1,34 @@
+import { Bell, AlertCircle } from 'lucide-react';
 import { PillLayout } from './PillLayout';
 
-export function NotificationPill({ app, message, iconUrl, iconColor }: { app: string; message: string; iconUrl?: string; iconColor?: string }) {
+export function NotificationPill() {
   return (
-    <PillLayout height={56}>
-      <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 10 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: '#2A2A2A', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0, overflow: 'hidden' }}>
-          {iconUrl ? (
-            <img src={iconUrl} alt={app} style={{ width: 18, height: 18 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          ) : (
-            <div style={{ width: 18, height: 18, borderRadius: 4, background: iconColor || '#888' }} />
-          )}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ fontSize: 10, color: '#888', fontWeight: 600 }}>{app}</div>
-            <span style={{ fontSize: 8, background: '#88888820', color: '#888', padding: '2px 6px', borderRadius: 4, fontWeight: 700, textTransform: 'uppercase' }}>Coming Soon</span>
-          </div>
-          <div style={{ fontSize: 12, color: '#FFFFEB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{message}</div>
-        </div>
-        <span style={{ fontSize: 10, color: '#666', flexShrink: 0 }}>now</span>
+    <div style={{
+      width: '100%',
+      background: '#1C1C1E',
+      padding: '16px 18px',
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      boxSizing: 'border-box', borderRadius: 14,
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+        background: '#88888815', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Bell size={15} color="#A0A0A5" />
       </div>
-    </PillLayout>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#F5F5EB', marginBottom: 4 }}>
+          Notifications
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+          <AlertCircle size={11} color="#FF8C00" />
+          <span style={{ fontSize: 11, color: '#FF8C00', fontWeight: 600 }}>Not connected</span>
+        </div>
+        <div style={{ fontSize: 11, color: '#6A6A70', lineHeight: 1.5 }}>
+          OS-level notification sync is coming soon. You'll be able to see and reply to your messages directly from Whispr.
+        </div>
+      </div>
+    </div>
   );
 }
-export const notificationPillMeta = { name: 'Notification', height: 56, keywords: ['gmail', 'email', 'message', 'text', 'notification'] };
+export const notificationPillMeta = { name: 'Notification', height: 100, keywords: ['notifications', 'messages', 'alerts', 'inbox'] };
