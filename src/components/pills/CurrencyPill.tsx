@@ -1,11 +1,11 @@
 import { ArrowRightLeft } from 'lucide-react';
 
 export function CurrencyPill({ data, defaultExpanded: _defaultExpanded = false }: { data?: any; defaultExpanded?: boolean }) {
-  const amount = data?.amount || 1;
+  const amount = Number(data?.amount) || 1;
   const from = data?.from || 'USD';
   const to = data?.to || 'EUR';
-  const converted = data?.converted || 0.85;
-  const rate = data?.rate || 0.85;
+  const converted = Number(data?.converted) || 0.85;
+  const rate = Number(data?.rate) || 0.85;
 
   return (
     <div style={{

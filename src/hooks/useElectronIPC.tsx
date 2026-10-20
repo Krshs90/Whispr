@@ -1,11 +1,23 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useIslandState } from '../context/IslandContext';
 import { findPillByQuery } from '../components/pills';
 
+export function normalizeToolToPillKey(toolName: string): string {
+  if (!toolName) return '';
+  if (toolName === 'set_timer') return 'timer';
+  if (toolName === 'open_calculator') return 'calculator';
+  if (toolName === 'check_system_health') return 'health';
+  if (toolName === 'get_system_stats') return 'system';
+  if (toolName === 'play_music') return 'music';
+  // whispr_control is a direct OS action (mute, volume, launch app) — do NOT open System & RAM Monitor
+  if (toolName === 'whispr_control') return '';
+  return toolName.replace(/^(get_|search_|play_|open_|set_)/, '');
+}
+
 export function useElectronIPC() {
   const {
-    phase, setPhase,
-    pillStack, setPillStack,
+    setPhase,
+    setPillStack,
     setActiveView,
     setIsFollowUpLoading,
     setSlowWarning,
@@ -13,13 +25,14 @@ export function useElectronIPC() {
     pillStackRef,
     updateSessions,
     dismiss,
-    sessions
   } = useIslandState();
+
+  const lastToolPillIdRef = useRef<Record<number, string>>({});
 
   // Push API keys to the backend for background tasks (like Health Monitor)
   useEffect(() => {
-    if ((window as any).electronAPI?.updateApiKeys) {
-      (window as any).electronAPI.updateApiKeys({
+    if (window.electronAPI?.updateApiKeys) {
+      window.electronAPI.updateApiKeys({
         weather: localStorage.getItem('whispr_api_weather') || ''
       });
     }
@@ -28,53 +41,48 @@ export function useElectronIPC() {
   // First-launch Hardware Onboarding Intercept
   useEffect(() => {
     if (localStorage.getItem('whispr_hw_scanned') !== 'true') {
-      (window as any).electronAPI?.openMainApp();
+      window.electronAPI?.openMainApp();
     }
   }, []);
 
-  // Sync external widget generation from MainApp
-  useEffect(() => {
-    const activeSession = sessions.find((s: any) => s.id === activeChatIdRef.current);
-    if (!activeSession) return;
-    const lastMsg = activeSession.messages[activeSession.messages.length - 1];
-    if (lastMsg && lastMsg.role === 'assistant' && lastMsg.pill) {
-      const pillIdx = findPillByQuery(lastMsg.pill);
-      if (pillIdx >= 0) {
-        setPillStack(prev => {
-          if (prev.some(p => p.pillIdx === pillIdx)) return prev;
-          return [...prev, { id: Date.now().toString(), pillIdx, pillData: lastMsg.pillData }];
-        });
-      }
-    }
-  }, [sessions]);
-
   // IPC listeners
   useEffect(() => {
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (!api) return;
     
     const cleanupShow = api.onShowIsland(() => {
-      const skipAnim = localStorage.getItem('whispr_skip_dynamic_anim') === 'true';
-      if (pillStack.length > 0) {
-        setPhase('dynamic');
-      } else {
-        if (skipAnim) {
-          setPhase('dynamic');
-          setActiveView('-1');
-        } else {
-          setPhase('orb');
+      const disableAll = localStorage.getItem('whispr_disable_all_anim') === 'true';
+      const skipOrbAnim = localStorage.getItem('whispr_skip_dynamic_anim') === 'true';
+      setPhase(current => {
+        if (current === 'response' || current === 'processing') {
+          return current;
         }
-      }
+        if (current === 'dynamic') {
+          return 'dynamic';
+        }
+        if (disableAll || skipOrbAnim) {
+          setActiveView('-1');
+          return 'dynamic';
+        }
+        return 'orb';
+      });
     });
     
     const cleanupHide = api.onHideIsland(() => {
       dismiss();
     });
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key.toLowerCase() === 'i' || e.key === 'Alt' || e.key === ' ') {
+        window.electronAPI?.shortcutReleased?.();
+      }
+    };
+    window.addEventListener('keyup', handleKeyUp);
     
     const cleanupBlur = api.onWindowBlur(() => { });
 
     const cleanupSlowWarning = api.onChatSlowWarning((speedInfo) => {
-      setSlowWarning(speedInfo as any);
+      setSlowWarning(speedInfo);
     });
 
     const cleanupToken = api.onChatToken((token) => {
@@ -87,8 +95,8 @@ export function useElectronIPC() {
       const currentChatId = activeChatIdRef.current || localStorage.getItem('whispr_active_chat') || '';
       if (!currentChatId) return;
 
-      updateSessions((prev: any) =>
-        prev.map((s: any) => {
+      updateSessions(prev =>
+        prev.map(s => {
           if (s.id !== currentChatId) return s;
           const newMsgs = [...s.messages];
           const lastMsg = newMsgs[newMsgs.length - 1];
@@ -105,15 +113,29 @@ export function useElectronIPC() {
     });
 
     const cleanupTool = api.onChatTool((toolData) => {
-      const keyword = toolData.toolName.replace('get_', '').replace('search_', '').replace('play_', '');
-      const searchKey = keyword === 'check_system_health' ? 'health' : keyword;
-      const pillIdx = findPillByQuery(searchKey);
+      const searchKey = normalizeToolToPillKey(toolData.toolName);
+      if (!searchKey) {
+        // Direct OS action (e.g. whispr_control) — show response text instead of opening a widget
+        setActiveView('-1');
+        setPhase('response');
+        return;
+      }
 
+      const pillIdx = findPillByQuery(searchKey);
       const currentChatId = activeChatIdRef.current || localStorage.getItem('whispr_active_chat') || '';
 
       if (pillIdx >= 0) {
-        const existingPill = pillStackRef.current.find(p => p.pillIdx === pillIdx);
-        const targetId = existingPill ? existingPill.id : Date.now().toString() + Math.random().toString(36).substr(2, 5);
+        // Allow multiple sports widgets to be open simultaneously
+        const allowMultipleInstances = searchKey === 'sports';
+        const existingPill = allowMultipleInstances
+          ? undefined
+          : pillStackRef.current.find(p => p.pillIdx === pillIdx);
+
+        const targetId = existingPill
+          ? existingPill.id
+          : Date.now().toString() + Math.random().toString(36).slice(2, 7);
+
+        lastToolPillIdRef.current[pillIdx] = targetId;
 
         if (!existingPill) {
           setPillStack(prev => [...prev, { id: targetId, pillIdx, pillData: toolData.args }]);
@@ -125,8 +147,8 @@ export function useElectronIPC() {
         setPhase('dynamic');
 
         if (currentChatId) {
-          updateSessions((prev: any) =>
-            prev.map((s: any) => {
+          updateSessions(prev =>
+            prev.map(s => {
               if (s.id !== currentChatId) return s;
               const newMsgs = [...s.messages];
               const lastMsg = newMsgs[newMsgs.length - 1];
@@ -141,19 +163,21 @@ export function useElectronIPC() {
       }
     });
 
-    const cleanupToolResult = (api as any).onChatToolResult?.((resultData: { toolName: string, resultStr: string }) => {
-      const keyword = resultData.toolName.replace('get_', '').replace('search_', '').replace('play_', '');
-      const searchKey = keyword === 'check_system_health' ? 'health' : keyword;
-      const pillIdx = findPillByQuery(searchKey);
+    const cleanupToolResult = api.onChatToolResult?.((resultData) => {
+      const searchKey = normalizeToolToPillKey(resultData.toolName);
+      if (!searchKey) return;
 
+      const pillIdx = findPillByQuery(searchKey);
       const currentChatId = activeChatIdRef.current || localStorage.getItem('whispr_active_chat') || '';
 
       if (pillIdx >= 0) {
         let parsedResult = {};
-        try { parsedResult = JSON.parse(resultData.resultStr); } catch (e) { }
+        try { parsedResult = JSON.parse(resultData.resultStr); } catch { /* ignore invalid json */ }
+
+        const targetId = lastToolPillIdRef.current[pillIdx];
 
         setPillStack(prev => prev.map(p => {
-          if (p.pillIdx === pillIdx) {
+          if (targetId ? p.id === targetId : p.pillIdx === pillIdx) {
             return { ...p, pillData: { ...p.pillData, ...parsedResult } };
           }
           return p;
@@ -187,12 +211,13 @@ export function useElectronIPC() {
     window.addEventListener('beforeunload', handleUnload);
 
     return () => {
+      window.removeEventListener('keyup', handleKeyUp);
       cleanupShow(); cleanupHide(); cleanupBlur();
       cleanupToken(); cleanupTool(); cleanupSlowWarning();
       if (cleanupToolResult) cleanupToolResult();
       cleanupEnd();
       window.removeEventListener('beforeunload', handleUnload);
     };
-  }, [dismiss, pillStack.length, setPhase, setPillStack, setActiveView, setIsFollowUpLoading, setSlowWarning, activeChatIdRef, pillStackRef, updateSessions]);
+  }, [dismiss, setPhase, setPillStack, setActiveView, setIsFollowUpLoading, setSlowWarning, activeChatIdRef, pillStackRef, updateSessions]);
 
 }

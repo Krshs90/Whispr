@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Cpu, Keyboard, Mic, Shield, Palette, Bell, Globe, Construction, Eye } from 'lucide-react';
+import { ArrowLeft, Cpu, Keyboard, Mic, Shield, Palette, Bell, Globe, Construction, Eye, Terminal, CheckCircle2 } from 'lucide-react';
 
-// Import actual pill components for the widget showcase
+// Import all pill components for the Widgets Index showcase
 import { WeatherPill } from './components/pills/WeatherPill';
 import { SportsPill } from './components/pills/SportsPill';
 import { StocksPill } from './components/pills/StocksPill';
@@ -10,9 +10,12 @@ import { MusicPill } from './components/pills/MusicPill';
 import { CalculatorPill } from './components/pills/CalculatorPill';
 import { CurrencyPill } from './components/pills/CurrencyPill';
 import { SystemPill } from './components/pills/SystemPill';
+import { ConnectivityPill } from './components/pills/ConnectivityPill';
 import { TranslationPill } from './components/pills/TranslationPill';
 import { CalendarPill } from './components/pills/CalendarPill';
 import { TasksPill } from './components/pills/TasksPill';
+import { TimerPill } from './components/pills/TimerPill';
+import { FlightPill } from './components/pills/FlightPill';
 
 import { GeneralSettings } from './components/settings/GeneralSettings';
 import { AITab } from './components/settings/AITab';
@@ -21,6 +24,15 @@ interface SettingsProps {
   onClose: () => void;
   isOpen?: boolean;
   initialTab?: string;
+}
+
+function sanitizeStoredModel(key: string, fallback: string): string {
+  const raw = localStorage.getItem(key) || fallback;
+  const cleaned = raw.trim().replace(/^qqwen/i, 'qwen').replace(/^lllama/i, 'llama');
+  if (cleaned !== raw) {
+    localStorage.setItem(key, cleaned);
+  }
+  return cleaned;
 }
 
 // ─── In Development Banner ───
@@ -41,22 +53,23 @@ function DevBanner() {
   );
 }
 
-function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
+function Settings({ onClose, isOpen: _isOpen = true, initialTab }: SettingsProps) {
   const [tab, setTab] = useState<string>(initialTab || 'general');
   const [userName, setUserName] = useState(() => localStorage.getItem('whispr_user_name') || '');
   const [userContext, setUserContext] = useState(() => localStorage.getItem('whispr_user_context') || '');
+  const [musicPlatform, setMusicPlatform] = useState(() => localStorage.getItem('whispr_music_platform') || 'spotify');
   const [favoritePlaylist, setFavoritePlaylist] = useState(() => localStorage.getItem('whispr_spotify_playlist') || '');
-  const [ollamaModel, setOllamaModel] = useState(() => localStorage.getItem('whispr_ollama_model') || 'gemma4:e4b');
+  const [ollamaModel, setOllamaModel] = useState(() => sanitizeStoredModel('whispr_ollama_model', 'llama3.2:latest'));
   
   // Custom Dynamic Models Configurations
-  const [prefFast, setPrefFast] = useState(() => localStorage.getItem('whispr_pref_fast') || 'llama3.2');
-  const [prefHeavy, setPrefHeavy] = useState(() => localStorage.getItem('whispr_pref_heavy') || 'qwen2.5:14b');
+  const [prefFast, setPrefFast] = useState(() => sanitizeStoredModel('whispr_pref_fast', 'llama3.2:latest'));
+  const [prefHeavy, setPrefHeavy] = useState(() => sanitizeStoredModel('whispr_pref_heavy', 'llama3:8b'));
   
   // Advanced Specialty Models
-  const [prefMath, setPrefMath] = useState(() => localStorage.getItem('whispr_pref_math') || '');
-  const [prefCode, setPrefCode] = useState(() => localStorage.getItem('whispr_pref_code') || '');
-  const [prefHistory, setPrefHistory] = useState(() => localStorage.getItem('whispr_pref_history') || '');
-  const [prefBusiness, setPrefBusiness] = useState(() => localStorage.getItem('whispr_pref_business') || '');
+  const [prefMath, setPrefMath] = useState(() => sanitizeStoredModel('whispr_pref_math', ''));
+  const [prefCode, setPrefCode] = useState(() => sanitizeStoredModel('whispr_pref_code', ''));
+  const [prefHistory, setPrefHistory] = useState(() => sanitizeStoredModel('whispr_pref_history', ''));
+  const [prefBusiness, setPrefBusiness] = useState(() => sanitizeStoredModel('whispr_pref_business', ''));
 
   // Local Models Database
   const [installedModels, setInstalledModels] = useState<string[]>([]);
@@ -66,6 +79,7 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
   useEffect(() => {
     window.electronAPI?.getInstalledModels().then(setInstalledModels).catch(() => {});
   }, []);
+
   const [keybind, setKeybind] = useState(() => localStorage.getItem('whispr_global_shortcut') || 'Ctrl + I');
   
   // Security settings with persistence
@@ -77,30 +91,108 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
   const [notifications, setNotifications] = useState(true);
   const [autoStart, setAutoStart] = useState(() => localStorage.getItem('whispr_auto_start') === 'true');
   const [useSpecialized, setUseSpecialized] = useState(() => localStorage.getItem('whispr_use_specialized') !== 'false');
-  const [dynamicAnimations, setDynamicAnimations] = useState(() => {
-    return localStorage.getItem('whispr_skip_dynamic_anim') !== 'true';
-  });
-  
-  // API Keys
-  const [apiWeather, setApiWeather] = useState(() => localStorage.getItem('whispr_api_weather') || '');
 
-  // Whispr Vision & Control
-  const [monitors, setMonitors] = useState<any[]>([]);
+  // Granular Animation Settings
+  const [masterAnimations, setMasterAnimations] = useState(() => localStorage.getItem('whispr_disable_all_anim') !== 'true');
+  const [dynamicAnimations, setDynamicAnimations] = useState(() => localStorage.getItem('whispr_skip_dynamic_anim') !== 'true');
+  const [springPhysics, setSpringPhysics] = useState(() => localStorage.getItem('whispr_disable_spring_physics') !== 'true');
+  const [pillAnimations, setPillAnimations] = useState(() => localStorage.getItem('whispr_disable_pill_transitions') !== 'true');
+  const [chatAnimations, setChatAnimations] = useState(() => localStorage.getItem('whispr_disable_chat_anim') !== 'true');
+
+  // Optional API Keys
+  const [apiWeather, setApiWeather] = useState(() => localStorage.getItem('whispr_api_weather') || '');
+  const [apiStocks, setApiStocks] = useState(() => localStorage.getItem('whispr_api_stocks') || '');
+  const [apiSearch, setApiSearch] = useState(() => localStorage.getItem('whispr_api_search') || '');
+
+  // Whispr Vision & Whispr Control
+  const [monitors, setMonitors] = useState<Array<{ id: string; name: string }>>([]);
   const [visionEnabled, setVisionEnabled] = useState(() => localStorage.getItem('whispr_vision_enabled') !== 'false');
   const [allowedMonitors, setAllowedMonitors] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('whispr_allowed_monitors') || '[]'); } catch { return []; }
   });
-  const [allowControl, setAllowControl] = useState(() => localStorage.getItem('whispr_allow_control') === 'true');
+  const [allowControl, setAllowControl] = useState(() => {
+    const val = localStorage.getItem('whispr_control_enabled') ?? localStorage.getItem('whispr_allow_control');
+    return val !== 'false';
+  });
 
+  // Detect monitors only once (or when opening Security tab if not yet loaded) so switching tabs never lags!
   useEffect(() => {
-    if (tab === 'security' && (window as any).electronAPI?.getMonitors) {
-      (window as any).electronAPI.getMonitors().then(setMonitors);
+    if (monitors.length > 0) return;
+    if (tab !== 'security' && localStorage.getItem('whispr_monitors_initialized') === 'true') return;
+    if (window.electronAPI?.getMonitors) {
+      window.electronAPI.getMonitors().then((detected: Array<{ id: string; name: string }>) => {
+        setMonitors(detected);
+        const initialized = localStorage.getItem('whispr_monitors_initialized') === 'true';
+        if (detected.length > 0 && (!initialized || (visionEnabled && allowedMonitors.length === 0))) {
+          const allIds = detected.map(m => m.id);
+          setAllowedMonitors(allIds);
+          localStorage.setItem('whispr_allowed_monitors', JSON.stringify(allIds));
+          localStorage.setItem('whispr_monitors_initialized', 'true');
+        }
+      }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  const handleAnimChange = (val: boolean) => {
-    setDynamicAnimations(val);
-    localStorage.setItem('whispr_skip_dynamic_anim', val ? 'false' : 'true');
+  const notifyAnimChanged = () => {
+    window.dispatchEvent(new Event('whispr-anim-prefs-changed'));
+  };
+
+  const handleMasterAnimChange = (enabled: boolean) => {
+    setMasterAnimations(enabled);
+    localStorage.setItem('whispr_disable_all_anim', enabled ? 'false' : 'true');
+    if (enabled) {
+      // When re-enabling master animations, also re-enable sub-animations so it never stays stuck disabled!
+      setDynamicAnimations(true);
+      localStorage.setItem('whispr_skip_dynamic_anim', 'false');
+      setSpringPhysics(true);
+      localStorage.setItem('whispr_disable_spring_physics', 'false');
+      setPillAnimations(true);
+      localStorage.setItem('whispr_disable_pill_transitions', 'false');
+      setChatAnimations(true);
+      localStorage.setItem('whispr_disable_chat_anim', 'false');
+    }
+    notifyAnimChanged();
+  };
+
+  const handleDynamicAnimChange = (enabled: boolean) => {
+    setDynamicAnimations(enabled);
+    localStorage.setItem('whispr_skip_dynamic_anim', enabled ? 'false' : 'true');
+    if (enabled && !masterAnimations) {
+      setMasterAnimations(true);
+      localStorage.setItem('whispr_disable_all_anim', 'false');
+    }
+    notifyAnimChanged();
+  };
+
+  const handleSpringPhysicsChange = (enabled: boolean) => {
+    setSpringPhysics(enabled);
+    localStorage.setItem('whispr_disable_spring_physics', enabled ? 'false' : 'true');
+    if (enabled && !masterAnimations) {
+      setMasterAnimations(true);
+      localStorage.setItem('whispr_disable_all_anim', 'false');
+    }
+    notifyAnimChanged();
+  };
+
+  const handlePillAnimChange = (enabled: boolean) => {
+    setPillAnimations(enabled);
+    localStorage.setItem('whispr_disable_pill_transitions', enabled ? 'false' : 'true');
+    if (enabled && !masterAnimations) {
+      setMasterAnimations(true);
+      localStorage.setItem('whispr_disable_all_anim', 'false');
+    }
+    notifyAnimChanged();
+  };
+
+  const handleChatAnimChange = (enabled: boolean) => {
+    setChatAnimations(enabled);
+    localStorage.setItem('whispr_disable_chat_anim', enabled ? 'false' : 'true');
+    if (enabled && !masterAnimations) {
+      setMasterAnimations(true);
+      localStorage.setItem('whispr_disable_all_anim', 'false');
+    }
+    notifyAnimChanged();
   };
 
   // Keyboard shortcut listener
@@ -125,9 +217,7 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
         
         if (!isModifier) {
           localStorage.setItem('whispr_global_shortcut', newBind);
-          if ((window as any).electronAPI?.updateShortcut) {
-            (window as any).electronAPI.updateShortcut(newBind);
-          }
+          window.electronAPI?.updateShortcut?.(newBind);
           setIsListening(false);
         }
       }
@@ -145,7 +235,7 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
     { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell size={16} /> },
     { id: 'widgets', label: 'Widgets Index', icon: <Eye size={16} /> },
-    { id: 'services', label: 'Services', icon: <Globe size={16} /> },
+    { id: 'services', label: 'Services & APIs', icon: <Globe size={16} /> },
   ];
 
   return (
@@ -174,7 +264,7 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ fontSize: 11, opacity: 0.3, padding: '0 12px' }}>Whispr Beta 0.0.1</div>
+        <div style={{ fontSize: 11, opacity: 0.3, padding: '0 12px' }}>Whispr Beta 0.2.0</div>
       </div>
 
       {/* Content */}
@@ -184,6 +274,7 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
           <GeneralSettings
             userName={userName} setUserName={setUserName}
             userContext={userContext} setUserContext={setUserContext}
+            musicPlatform={musicPlatform} setMusicPlatform={setMusicPlatform}
             favoritePlaylist={favoritePlaylist} setFavoritePlaylist={setFavoritePlaylist}
             autoStart={autoStart} setAutoStart={setAutoStart}
           />
@@ -210,9 +301,9 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
         {tab === 'shortcuts' && (
           <div>
             <h3 style={s.sectionTitle}>Keyboard Shortcuts</h3>
-            <p style={s.sectionDesc}>Customize how you invoke Whispr.</p>
+            <p style={s.sectionDesc}>Customize how you summon the Whispr Dynamic Bar on your desktop.</p>
             <div style={s.field}>
-              <label style={s.label}>Toggle Dynamic Bar</label>
+              <label style={s.label}>Toggle Dynamic Bar (Primary)</label>
               <div style={s.keybindBox}>
                 <span style={{
                   ...s.keybindText,
@@ -222,9 +313,14 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
                   animation: isListening ? 'pulse 1.5s ease-in-out infinite' : 'none',
                 }}>{isListening ? 'Press keys...' : keybind}</span>
                 <button onClick={() => setIsListening(true)} style={s.keybindBtn}>Change</button>
-                <button onClick={() => { setKeybind('Ctrl + I'); setIsListening(false); }} style={{ ...s.keybindBtn, color: '#FF3B30', borderColor: '#FF3B3044' }}>Reset</button>
+                <button onClick={() => {
+                  setKeybind('Ctrl + I');
+                  localStorage.setItem('whispr_global_shortcut', 'Ctrl + I');
+                  window.electronAPI?.updateShortcut?.('Ctrl + I');
+                  setIsListening(false);
+                }} style={{ ...s.keybindBtn, color: '#FF3B30', borderColor: '#FF3B3044' }}>Reset</button>
               </div>
-              <span style={s.hint}>{isListening ? '⌨️ Press the new key combination now...' : 'Press Change, then press your desired key combo.'}</span>
+              <span style={s.hint}>{isListening ? '⌨️ Press the new key combination now...' : 'Secondary shortcut Alt + Space is also always active.'}</span>
             </div>
           </div>
         )}
@@ -247,10 +343,10 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
         {tab === 'security' && (
           <div>
             <h3 style={s.sectionTitle}>Permissions & Safety</h3>
-            <p style={s.sectionDesc}>Control what Whispr can do on your system.</p>
-            <Toggle label="Confirm before opening applications" value={confirmApps} onChange={setConfirmApps} desc="Whispr will ask permission before launching any app." />
-            <Toggle label="Confirm before visiting sensitive sites" value={confirmSensitive} onChange={setConfirmSensitive} desc="Blocks banking, password managers, and financial sites without approval." />
-            <Toggle label="Confirm before system actions" value={confirmSystem} onChange={setConfirmSystem} desc="File operations, registry changes, and installations require approval." />
+            <p style={s.sectionDesc}>Control what Whispr can access and automate on your Windows system.</p>
+            <Toggle label="Confirm before opening applications" value={confirmApps} onChange={v => { setConfirmApps(v); localStorage.setItem('whispr_sec_apps', String(v)); }} desc="Whispr will log and confirm before launching external apps." />
+            <Toggle label="Confirm before visiting sensitive sites" value={confirmSensitive} onChange={v => { setConfirmSensitive(v); localStorage.setItem('whispr_sec_sensitive', String(v)); }} desc="Blocks banking, password managers, and financial sites without approval." />
+            <Toggle label="Confirm before system actions" value={confirmSystem} onChange={v => { setConfirmSystem(v); localStorage.setItem('whispr_sec_system', String(v)); }} desc="System volume, window management, and lock commands." />
             
             <div style={{ marginTop: 16, background: '#1A1A1A', border: '1px solid #2A2A2A', borderRadius: 8, padding: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -265,8 +361,8 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
             <h3 style={s.sectionTitle}>Screen & Automation Control</h3>
             <div style={{ background: '#0D0D0D', border: '1px solid #2A2A2A', borderRadius: 12, padding: 16, marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#FFFFEB' }}>Whispr Vision (Screen Reading)</div>
-                <div style={{ fontSize: 10, color: '#4ADE80', fontWeight: 600, background: '#4ADE8015', padding: '2px 8px', borderRadius: 4 }}>BETA</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#FFFFEB' }}>Whispr Vision (Multi-Monitor Screen Reading)</div>
+                <div style={{ fontSize: 10, color: '#4ADE80', fontWeight: 600, background: '#4ADE8015', padding: '2px 8px', borderRadius: 4 }}>ACTIVE · LLAVA READY</div>
               </div>
               <Toggle 
                 label="Enable Whispr Vision" 
@@ -274,34 +370,70 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
                 onChange={(val) => {
                   setVisionEnabled(val);
                   localStorage.setItem('whispr_vision_enabled', val.toString());
+                  // Automatically enable ALL detected monitors when the user turns Whispr Vision ON
+                  if (val) {
+                    if (monitors.length > 0) {
+                      const allIds = monitors.map(m => m.id);
+                      setAllowedMonitors(allIds);
+                      localStorage.setItem('whispr_allowed_monitors', JSON.stringify(allIds));
+                      localStorage.setItem('whispr_monitors_initialized', 'true');
+                    } else {
+                      window.electronAPI?.getMonitors?.().then((detected: Array<{ id: string; name: string }>) => {
+                        setMonitors(detected);
+                        const allIds = detected.map(m => m.id);
+                        setAllowedMonitors(allIds);
+                        localStorage.setItem('whispr_allowed_monitors', JSON.stringify(allIds));
+                        localStorage.setItem('whispr_monitors_initialized', 'true');
+                      });
+                    }
+                  }
                 }} 
-                desc="Allow Whispr to capture screenshots to understand visual context." 
+                desc="Allow Whispr to capture screenshots when you ask 'What is on my screen?'. Automatically enables all monitors when turned on." 
               />
-              <div style={{ marginTop: 10, padding: '8px 12px', background: '#1A1100', border: '1px solid #3D2E00', borderRadius: 8 }}>
-                <p style={{ fontSize: 11, color: '#FFB800', margin: 0, lineHeight: 1.5 }}>
-                  ⚠️ <strong>Experimental:</strong> Multi-screen detection may not work reliably on all setups. Vision responses depend on the quality of the installed vision model. For best results, use <strong>llava</strong> or <strong>llama3.2-vision</strong>.
-                </p>
-              </div>
               
               {visionEnabled && (
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #222' }}>
-                  <p style={{ fontSize: 11, color: '#888', marginBottom: 12 }}>Select which monitors Whispr is allowed to view:</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ fontSize: 11, color: '#A0A0A5', fontWeight: 600 }}>
+                      Active Monitors ({allowedMonitors.length}/{monitors.length} enabled — toggle off any monitor manually):
+                    </span>
+                    {monitors.length > 1 && (
+                      <button
+                        onClick={() => {
+                          const allIds = monitors.map(m => m.id);
+                          setAllowedMonitors(allIds);
+                          localStorage.setItem('whispr_allowed_monitors', JSON.stringify(allIds));
+                        }}
+                        style={{ background: '#222', border: '1px solid #333', color: '#4ADE80', fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer' }}
+                      >
+                        Enable All Monitors
+                      </button>
+                    )}
+                  </div>
                   {monitors.length === 0 ? (
                     <div style={{ fontSize: 11, color: '#555', fontStyle: 'italic' }}>Detecting monitors...</div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {monitors.map(m => (
-                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1A1A1A', padding: '8px 12px', borderRadius: 8, border: '1px solid #222' }}>
-                          <span style={{ fontSize: 12, color: '#FFFFEB' }}>{m.name}</span>
+                      {monitors.map((m, idx) => (
+                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1A1A1A', padding: '10px 14px', borderRadius: 8, border: '1px solid #26262A' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Eye size={14} color={allowedMonitors.includes(m.id) ? '#4ADE80' : '#555'} />
+                            <span style={{ fontSize: 12, color: '#FFFFEB', fontWeight: 500 }}>{m.name || `Monitor ${idx + 1}`}</span>
+                            <span style={{ fontSize: 10, color: '#666', fontFamily: 'monospace' }}>({m.id})</span>
+                          </div>
                           <Toggle 
                             label="" 
                             value={allowedMonitors.includes(m.id)} 
                             onChange={(val) => {
                               let next = [...allowedMonitors];
-                              if (val) next.push(m.id);
-                              else next = next.filter(id => id !== m.id);
+                              if (val) {
+                                if (!next.includes(m.id)) next.push(m.id);
+                              } else {
+                                next = next.filter(id => id !== m.id);
+                              }
                               setAllowedMonitors(next);
                               localStorage.setItem('whispr_allowed_monitors', JSON.stringify(next));
+                              localStorage.setItem('whispr_monitors_initialized', 'true');
                             }} 
                             inline 
                           />
@@ -315,18 +447,34 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
 
             <div style={{ background: '#0D0D0D', border: '1px solid #2A2A2A', borderRadius: 12, padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#FFFFEB' }}>Whispr Control (Automation)</div>
-                <div style={{ fontSize: 10, color: '#FB923C', fontWeight: 600, background: '#FB923C15', padding: '2px 8px', borderRadius: 4 }}>EXPERIMENTAL</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#FFFFEB' }}>Whispr Control (Windows Desktop Automation)</div>
+                <div style={{ fontSize: 10, color: allowControl ? '#4ADE80' : '#888', fontWeight: 600, background: allowControl ? '#4ADE8015' : '#222', padding: '2px 8px', borderRadius: 4 }}>
+                  {allowControl ? 'ENABLED' : 'DISABLED'}
+                </div>
               </div>
               <Toggle 
-                label="Allow Whispr to control your mouse & keyboard" 
+                label="Enable Whispr Control for Windows Automation" 
                 value={allowControl} 
                 onChange={(val) => {
                   setAllowControl(val);
+                  localStorage.setItem('whispr_control_enabled', val.toString());
                   localStorage.setItem('whispr_allow_control', val.toString());
                 }} 
-                desc="When enabled, Whispr can execute multi-step macros and physically control your screen (requires confirmation per action)." 
+                desc="Allows Whispr to execute native desktop actions via whispr_control tool." 
               />
+              {allowControl && (
+                <div style={{ marginTop: 12, padding: '10px 12px', background: '#161618', borderRadius: 8, border: '1px solid #26262C' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: '#A0A0A5', marginBottom: 6 }}>
+                    <Terminal size={12} color="#4ADE80" /> Supported Voice / Text Commands:
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11, color: '#888' }}>
+                    <span>• "Open Notepad / Calculator / Spotify"</span>
+                    <span>• "Mute volume" / "Volume up"</span>
+                    <span>• "Set volume to 50"</span>
+                    <span>• "Minimize all windows" / "Lock my PC"</span>
+                  </div>
+                </div>
+              )}
             </div>
             <hr style={s.divider} />
             <h3 style={s.sectionTitle}>Data Privacy</h3>
@@ -353,17 +501,16 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
         {/* ═══ APPEARANCE ═══ */}
         {tab === 'appearance' && (
           <div>
-            <DevBanner />
             <h3 style={s.sectionTitle}>Theme</h3>
-            <p style={s.sectionDesc}>Theme customization is coming soon. Currently running in Dark mode.</p>
+            <p style={s.sectionDesc}>Whispr is engineered for low-glare OLED dark mode on Windows.</p>
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{
-                width: 100, height: 72, borderRadius: 12, border: '2px solid #FFFFEB',
+                width: 100, height: 72, borderRadius: 12, border: '2px solid #4ADE80',
                 background: '#1A1A1A', color: '#FFFFEB', display: 'flex', flexDirection: 'column',
-                justifyContent: 'center', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500,
+                justifyContent: 'center', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600,
               }}>
-                <div style={{ width: 24, height: 14, borderRadius: 7, background: '#FFFFEB', opacity: 0.3 }} />
-                Dark
+                <div style={{ width: 24, height: 14, borderRadius: 7, background: '#4ADE80', opacity: 0.5 }} />
+                Dark (Active)
               </div>
               <div style={{
                 width: 100, height: 72, borderRadius: 12, border: '1px solid #2A2A2A',
@@ -376,9 +523,48 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
                 Light
               </div>
             </div>
+
             <hr style={s.divider} />
-            <h3 style={s.sectionTitle}>Animations</h3>
-            <Toggle label="Full dynamic bar animation (orb to pill)" value={dynamicAnimations} onChange={handleAnimChange} desc="If disabled, the bar will instantly pop in as a text input instead of expanding from an orb." />
+            <h3 style={s.sectionTitle}>Animations & Motion Control</h3>
+            <p style={s.sectionDesc}>
+              Fine-tune or disable animations across the Dynamic Bar and Dashboard. Changes apply immediately without restarting.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: '#121214', border: '1px solid #26262A', borderRadius: 12, padding: '12px 16px' }}>
+              <Toggle
+                label="Enable All UI Animations (Master Switch)"
+                value={masterAnimations}
+                onChange={handleMasterAnimChange}
+                desc="Master toggle for all motion effects. Turning this off makes every transition instantaneous."
+              />
+              <hr style={{ ...s.divider, margin: '8px 0' }} />
+              <div style={{ opacity: masterAnimations ? 1 : 0.45, transition: 'opacity 0.2s' }}>
+                <Toggle
+                  label="Dynamic Bar Orb Entrance Animation"
+                  value={masterAnimations && dynamicAnimations}
+                  onChange={handleDynamicAnimChange}
+                  desc="Morph from the glowing orb into the input pill when summoned with Ctrl+I or Alt+Space."
+                />
+                <Toggle
+                  label="Spring Physics & Elastic Bounce"
+                  value={masterAnimations && springPhysics}
+                  onChange={handleSpringPhysicsChange}
+                  desc="Use natural spring physics when resizing pills. Disable for fast linear transitions."
+                />
+                <Toggle
+                  label="Widget Card Stack & Expand Animations"
+                  value={masterAnimations && pillAnimations}
+                  onChange={handlePillAnimChange}
+                  desc="Smoothly animate height and card stacking when expanding Weather, Stocks, Sports, or News."
+                />
+                <Toggle
+                  label="Chat Message & Sidebar Transitions"
+                  value={masterAnimations && chatAnimations}
+                  onChange={handleChatAnimChange}
+                  desc="Animate message bubbles and view transitions inside the Main Dashboard."
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -412,44 +598,38 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
         {/* ═══ WIDGETS INDEX ═══ */}
         {tab === 'widgets' && (
           <div>
-            <h3 style={s.sectionTitle}>Widgets & Commands</h3>
+            <h3 style={s.sectionTitle}>Widgets Index & Live Previews</h3>
             <p style={s.sectionDesc}>
-              Whispr features dynamic, responsive widgets that magically appear based on context. 
-              Below are live previews of each widget with mock data. Try the commands to trigger them.
+              All 14 interactive Whispr widgets with their latest UI updates. Try any of the example prompts in the Dynamic Bar or Chat Dashboard.
             </p>
 
-            {/* Widget showcase with actual pill components */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
               {[
-                { name: 'Weather', cmd: '"Show the weather in Tokyo"', status: 'Live', statusColor: '#4ADE80', component: <WeatherPill data={MOCK_WEATHER} defaultExpanded={true} /> },
-                { name: 'Sports', cmd: '"What is the Cowboys score?"', status: 'Live', statusColor: '#4ADE80', component: <SportsPill data={MOCK_SPORTS} defaultExpanded={true} /> },
-                { name: 'Stocks', cmd: '"Check AAPL stock"', status: 'Live', statusColor: '#4ADE80', component: <StocksPill data={MOCK_STOCKS} defaultExpanded={true} /> },
-                { name: 'News', cmd: '"What is the latest news?"', status: 'Live', statusColor: '#4ADE80', component: <NewsPill data={MOCK_NEWS} defaultExpanded={true} /> },
-                { name: 'Music', cmd: '"What is playing?"', status: 'Native', statusColor: '#34D399', component: <MusicPill data={MOCK_MUSIC} defaultExpanded={true} /> },
-                { name: 'Calculator', cmd: '"Open the calculator"', status: 'Local', statusColor: '#60A5FA', component: <CalculatorPill defaultExpanded={true} /> },
-                { name: 'Currency', cmd: '"Convert 100 USD to EUR"', status: 'Live', statusColor: '#4ADE80', component: <CurrencyPill data={MOCK_CURRENCY} /> },
-                { name: 'System Monitor', cmd: '"Open system health"', status: 'Local', statusColor: '#60A5FA', component: <SystemPill data={MOCK_SYSTEM} /> },
-                { name: 'Translation', cmd: '"Translate this to French"', status: 'AI', statusColor: '#A78BFA', component: <TranslationPill /> },
-                { name: 'Tasks', cmd: '"Show my tasks"', status: 'Local', statusColor: '#60A5FA', component: <TasksPill defaultExpanded={true} /> },
-                { name: 'Calendar', cmd: '"Show my schedule"', status: 'Soon', statusColor: '#FB923C', component: <CalendarPill /> },
+                { name: 'Weather (Open-Meteo Live)', cmd: '"What\'s the weather in Chicago?"', status: 'Live · Keyless', statusColor: '#4ADE80', component: <WeatherPill data={MOCK_WEATHER} defaultExpanded={true} /> },
+                { name: 'Stocks & Crypto (Yahoo Finance + CoinCap)', cmd: '"Check NVDA stock" or "Price of Bitcoin"', status: 'Live · Keyless', statusColor: '#4ADE80', component: <StocksPill data={MOCK_STOCKS} defaultExpanded={true} /> },
+                { name: 'Sports Scoreboard (ESPN Live)', cmd: '"What are the latest NBA scores?"', status: 'Live · Keyless', statusColor: '#4ADE80', component: <SportsPill data={MOCK_SPORTS} defaultExpanded={true} /> },
+                { name: 'Google News Feed (Topic Tabs & Previews)', cmd: '"What\'s the top tech news today?"', status: 'Live · Keyless', statusColor: '#4ADE80', component: <NewsPill data={MOCK_NEWS} defaultExpanded={true} /> },
+                { name: 'Timer & Countdown', cmd: '"Set a timer for 1 minute"', status: 'Interactive', statusColor: '#FF9500', component: <TimerPill data={{ seconds: 60, autoStart: false }} /> },
+                { name: 'Tasks & To-Do List', cmd: '"Show my tasks" or "Add a task to buy groceries"', status: 'Persistent', statusColor: '#FF9500', component: <TasksPill defaultExpanded={true} /> },
+                { name: 'Multi-Language Translator (Native Script + Phonetics)', cmd: '"Translate \'Good morning, how are you?\' to Spanish and Japanese"', status: 'Live · GTX + AI', statusColor: '#4ADE80', component: <TranslationPill data={MOCK_TRANSLATION} /> },
+                { name: 'System & RAM Usage Monitor', cmd: '"Check my system health and RAM usage"', status: 'Live OS Telemetry', statusColor: '#60A5FA', component: <SystemPill data={MOCK_SYSTEM} defaultExpanded={true} /> },
+                { name: 'System Health & AI Diagnostics', cmd: '"Run system diagnostics"', status: 'Live Telemetry', statusColor: '#4ADE80', component: <ConnectivityPill data={MOCK_HEALTH} /> },
+                { name: 'Music & Spotify Controller (Windows SMTC)', cmd: '"What song is playing right now?"', status: 'Native Windows SMTC', statusColor: '#34D399', component: <MusicPill data={MOCK_MUSIC} defaultExpanded={true} /> },
+                { name: 'Scientific Calculator ( + Desmos Plotter in Chat)', cmd: '"Open calculator" or "Plot y = sin(x) * x"', status: 'Desmos + Local', statusColor: '#60A5FA', component: <CalculatorPill defaultExpanded={true} /> },
+                { name: 'Currency Converter', cmd: '"Convert 100 USD to EUR"', status: 'Live Exchange Rates', statusColor: '#4ADE80', component: <CurrencyPill data={MOCK_CURRENCY} defaultExpanded={true} /> },
+                { name: 'Calendar & Schedule', cmd: '"Show my schedule"', status: 'Local', statusColor: '#A78BFA', component: <CalendarPill /> },
+                { name: 'Flight Tracker', cmd: '"Check flight AA 100"', status: 'Preview', statusColor: '#FB923C', component: <FlightPill /> },
               ].map(w => (
-                <div key={w.name} style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: 16, overflow: 'hidden' }}>
-                  {/* Header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid #1A1A1A' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: '#FFFFEB' }}>{w.name}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 4, background: w.statusColor + '18', color: w.statusColor }}>{w.status}</span>
-                    </div>
+                <div key={w.name} style={{ background: '#111113', border: '1px solid #2A2A2E', borderRadius: 16, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid #1E1E22' }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#FFFFEB' }}>{w.name}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '3px 8px', borderRadius: 6, background: w.statusColor + '18', color: w.statusColor }}>{w.status}</span>
                   </div>
-                  {/* Live pill preview */}
-                  <div style={{ background: '#1A1A1A', maxHeight: 440, overflow: 'hidden' }}>
+                  <div style={{ background: '#18181A', maxHeight: 440, overflowY: 'auto' }}>
                     {w.component}
                   </div>
-                  {/* Command hint */}
-                  <div style={{ padding: '8px 16px', borderTop: '1px solid #1A1A1A' }}>
-                    <span style={{ fontSize: 11, color: '#555' }}>Try: <span style={{ color: '#4ADE80' }}>{w.cmd}</span></span>
+                  <div style={{ padding: '8px 16px', borderTop: '1px solid #1E1E22', background: '#141416' }}>
+                    <span style={{ fontSize: 11, color: '#777' }}>Try command: <span style={{ color: '#4ADE80', fontWeight: 600 }}>{w.cmd}</span></span>
                   </div>
                 </div>
               ))}
@@ -457,79 +637,142 @@ function Settings({ onClose, isOpen = true, initialTab }: SettingsProps) {
           </div>
         )}
 
-        {/* ═══ SERVICES ═══ */}
+        {/* ═══ SERVICES & API INTEGRATIONS ═══ */}
         {tab === 'services' && (
           <div>
-            <h3 style={s.sectionTitle}>API Integrations</h3>
-            <p style={s.sectionDesc}>Whispr uses local components but requires external API keys to fetch live data. Your keys are <strong>never</strong> sent anywhere except directly to these service providers.</p>
-            
-            {/* OpenWeatherMap */}
-            <div style={{ ...s.field, marginTop: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <label style={s.label}>OpenWeatherMap API Key</label>
-                <button onClick={() => (window as any).electronAPI?.openExternal('https://home.openweathermap.org/api_keys')} style={{ ...s.keybindBtn, fontSize: 10, padding: '2px 6px' }}>Get Free Key</button>
+            <h3 style={s.sectionTitle}>Built-In Zero-Config API Integrations</h3>
+            <p style={s.sectionDesc}>
+              These live integrations are pre-connected and work out-of-the-box with <strong>zero API keys required</strong>.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
+              {[
+                { name: 'Open-Meteo Weather & Geocoding', desc: 'Exact city weather, hourly & 7-day forecasts' },
+                { name: 'Yahoo Finance + CoinCap Crypto', desc: 'Real-time stocks, Bitcoin/crypto & company logos' },
+                { name: 'Google News RSS Sections', desc: 'Live Technology, AI, Business, Science & World news' },
+                { name: 'ESPN Live Scoreboard API', desc: 'Real-time NBA, NFL, MLB, NHL, Soccer & F1 scores' },
+                { name: 'Google Translate GTX Engine', desc: 'Multi-language native script + phonetic romaji' },
+                { name: 'Desmos Graphing Calculator API', desc: 'Interactive 2D function plotting & zoom in chat' },
+                { name: 'DuckDuckGo + Wikipedia Search', desc: 'Keyless live web & encyclopedia lookup' },
+                { name: 'ExchangeRate-API Currency', desc: 'Live global fiat currency conversion rates' },
+              ].map(svc => (
+                <div key={svc.name} style={{ background: '#121215', border: '1px solid #26262C', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <CheckCircle2 size={15} color="#4ADE80" style={{ marginTop: 2, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#FFFFEB' }}>{svc.name}</div>
+                    <div style={{ fontSize: 11, color: '#8A8A92', marginTop: 2 }}>{svc.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <hr style={s.divider} />
+            <h3 style={s.sectionTitle}>Optional Custom API Key Overrides</h3>
+            <p style={s.sectionDesc}>
+              Only needed if you prefer to route requests through your own personal API accounts instead of the built-in keyless providers.
+            </p>
+
+            {/* OpenWeatherMap Optional Override */}
+            <div style={{ ...s.field, marginTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, maxWidth: 440 }}>
+                <label style={{ ...s.label, margin: 0 }}>OpenWeatherMap API Key (Optional Override)</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {apiWeather && (
+                    <button onClick={() => {
+                      setApiWeather('');
+                      localStorage.removeItem('whispr_api_weather');
+                      window.electronAPI?.updateApiKeys?.({ weather: '' });
+                    }} style={{ ...s.keybindBtn, fontSize: 10, padding: '2px 6px', color: '#FF453A' }}>Remove</button>
+                  )}
+                  <button onClick={() => window.electronAPI?.openExternal('https://home.openweathermap.org/api_keys')} style={{ ...s.keybindBtn, fontSize: 10, padding: '2px 6px' }}>Get Key</button>
+                </div>
               </div>
               <input 
                 style={s.input} 
                 type="password" 
-                placeholder="Required for local forecast" 
+                placeholder="Leave blank to use built-in Open-Meteo" 
                 value={apiWeather}
                 onChange={e => { 
                   const val = e.target.value;
                   setApiWeather(val); 
                   localStorage.setItem('whispr_api_weather', val);
-                  if ((window as any).electronAPI?.updateApiKeys) {
-                    (window as any).electronAPI.updateApiKeys({ weather: val });
-                  }
+                  window.electronAPI?.updateApiKeys?.({ weather: val });
                 }}
               />
             </div>
 
-            {/* Web Search — built-in, no key */}
-            <div style={{ ...s.field, marginTop: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <label style={s.label}>Web Search (Built-in)</label>
-                <span style={{ fontSize: 10, color: '#4ADE80', fontWeight: 600, padding: '2px 8px', background: '#4ADE8018', borderRadius: 4 }}>No Key Needed</span>
+            {/* Finnhub Optional Override */}
+            <div style={{ ...s.field, marginTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, maxWidth: 440 }}>
+                <label style={{ ...s.label, margin: 0 }}>Finnhub Stocks API Key (Optional Override)</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {apiStocks && (
+                    <button onClick={() => {
+                      setApiStocks('');
+                      localStorage.removeItem('whispr_api_stocks');
+                    }} style={{ ...s.keybindBtn, fontSize: 10, padding: '2px 6px', color: '#FF453A' }}>Remove</button>
+                  )}
+                  <button onClick={() => window.electronAPI?.openExternal('https://finnhub.io/')} style={{ ...s.keybindBtn, fontSize: 10, padding: '2px 6px' }}>Get Key</button>
+                </div>
               </div>
-              <div style={{ ...s.input, color: '#888', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ADE80', flexShrink: 0 }} />
-                Powered by DuckDuckGo + Wikipedia (free, unlimited)
-              </div>
+              <input 
+                style={s.input} 
+                type="password" 
+                placeholder="Leave blank to use built-in Yahoo Finance + CoinCap" 
+                value={apiStocks}
+                onChange={e => { 
+                  const val = e.target.value;
+                  setApiStocks(val); 
+                  localStorage.setItem('whispr_api_stocks', val);
+                }}
+              />
             </div>
 
-            {/* Live Stocks */}
-            <div style={{ ...s.field, marginTop: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <label style={s.label}>Live Stocks</label>
-                <div style={{ fontSize: 10, color: '#4ADE80', fontWeight: 600, background: '#4ADE8015', padding: '2px 8px', borderRadius: 4 }}>NO KEY NEEDED</div>
+            {/* Serper.dev Optional Override */}
+            <div style={{ ...s.field, marginTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, maxWidth: 440 }}>
+                <label style={{ ...s.label, margin: 0 }}>Serper.dev Google Search Key (Optional Override)</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {apiSearch && (
+                    <button onClick={() => {
+                      setApiSearch('');
+                      localStorage.removeItem('whispr_api_search');
+                    }} style={{ ...s.keybindBtn, fontSize: 10, padding: '2px 6px', color: '#FF453A' }}>Remove</button>
+                  )}
+                  <button onClick={() => window.electronAPI?.openExternal('https://serper.dev/')} style={{ ...s.keybindBtn, fontSize: 10, padding: '2px 6px' }}>Get Key</button>
+                </div>
               </div>
-              <div style={{ ...s.input, color: '#888', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ADE80', flexShrink: 0 }} />
-                Powered by Yahoo Finance (free, real-time prices)
-              </div>
-            </div>
-
-            {/* Live News */}
-            <div style={{ ...s.field, marginTop: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <label style={s.label}>Live Breaking News</label>
-                <div style={{ fontSize: 10, color: '#4ADE80', fontWeight: 600, background: '#4ADE8015', padding: '2px 8px', borderRadius: 4 }}>NO KEY NEEDED</div>
-              </div>
-              <div style={{ ...s.input, color: '#888', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ADE80', flexShrink: 0 }} />
-                Powered by Google News RSS (free, top headlines)
-              </div>
+              <input 
+                style={s.input} 
+                type="password" 
+                placeholder="Leave blank to use built-in DuckDuckGo + Wikipedia" 
+                value={apiSearch}
+                onChange={e => { 
+                  const val = e.target.value;
+                  setApiSearch(val); 
+                  localStorage.setItem('whispr_api_search', val);
+                }}
+              />
             </div>
 
             <hr style={s.divider} />
-            <h3 style={s.sectionTitle}>Native Integrations</h3>
-            <p style={s.sectionDesc}>These services bypass APIs and interact directly with your OS.</p>
+            <h3 style={s.sectionTitle}>Native Windows OS Integrations</h3>
+            <p style={s.sectionDesc}>These integrations communicate directly with Windows 11 APIs locally.</p>
             <div style={s.appRow}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>Spotify Local Player</div>
-                <div style={{ fontSize: 11, opacity: 0.4 }}>Controls your desktop Spotify app via native Windows powershell instantly.</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Windows SMTC Media & Spotify Controller</div>
+                <div style={{ fontSize: 11, color: '#888' }}>Reads live track title, artist, timeline, and controls playback across Spotify and browsers.</div>
               </div>
-              <Toggle label="" value={true} onChange={() => {}} inline />
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#4ADE80', background: '#4ADE8018', padding: '3px 8px', borderRadius: 6 }}>ACTIVE</span>
+            </div>
+            <div style={s.appRow}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>DesktopCapturer Multi-Monitor Vision</div>
+                <div style={{ fontSize: 11, color: '#888' }}>Captures high-DPI screen frames for local LLaVA / Vision models when requested.</div>
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: visionEnabled ? '#4ADE80' : '#888', background: visionEnabled ? '#4ADE8018' : '#222', padding: '3px 8px', borderRadius: 6 }}>
+                {visionEnabled ? 'ACTIVE' : 'OFF'}
+              </span>
             </div>
           </div>
         )}
@@ -574,41 +817,6 @@ function Toggle({ label, value, onChange, desc, inline }: { label: string; value
           boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
         }} />
       </button>
-    </div>
-  );
-}
-
-// ─── Custom Dropdown ───
-function Dropdown({ value, options, onChange }: { value: string; options: { label: string; value: string }[]; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const selected = options.find(o => o.value === value) || options[0];
-
-  return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: 400 }}>
-      <div
-        onClick={() => setOpen(!open)}
-        style={{
-          padding: '10px 14px', borderRadius: 10, border: '1px solid #2A2A2A', background: '#222', color: '#FFFFEB', fontSize: 14, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-        }}
-      >
-        <span>{selected.label}</span>
-        <span style={{ fontSize: 10, opacity: 0.5 }}>▼</span>
-      </div>
-      {open && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: '#222', border: '1px solid #2A2A2A', borderRadius: 10, overflow: 'hidden', zIndex: 10 }}>
-          {options.map(o => (
-            <div
-              key={o.value}
-              onClick={() => { onChange(o.value); setOpen(false); }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#31312F'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-              style={{ padding: '10px 14px', fontSize: 14, cursor: 'pointer', color: '#FFFFEB' }}
-            >
-              {o.label}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -679,7 +887,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   sectionDesc: {
     fontSize: 12,
-    opacity: 0.45,
+    opacity: 0.55,
     margin: '0 0 16px',
     lineHeight: 1.5,
   },
@@ -690,37 +898,37 @@ const s: Record<string, React.CSSProperties> = {
     display: 'block',
     fontSize: 12,
     fontWeight: 500,
-    opacity: 0.7,
+    opacity: 0.8,
     marginBottom: 6,
   },
   input: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 440,
     padding: '10px 14px',
     borderRadius: 10,
     border: '1px solid #2A2A2A',
     background: '#222',
     color: '#FFFFEB',
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'inherit',
     outline: 'none',
   },
   select: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 440,
     padding: '10px 14px',
     borderRadius: 10,
     border: '1px solid #2A2A2A',
     background: '#222',
     color: '#FFFFEB',
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'inherit',
     outline: 'none',
   },
   hint: {
     display: 'block',
     fontSize: 11,
-    opacity: 0.35,
+    opacity: 0.45,
     marginTop: 6,
   },
   divider: {
@@ -732,7 +940,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
-    maxWidth: 400,
+    maxWidth: 440,
   },
   keybindText: {
     padding: '8px 16px',
@@ -777,17 +985,74 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 10,
     padding: '10px 0',
-    borderBottom: '1px solid #1A1A1A',
+    borderBottom: '1px solid #222',
   },
 };
 
 // ─── Mock Data for Widgets Showcase ───
-const MOCK_WEATHER = { location: 'Tokyo, JP', temp: 68, feelsLike: 66, condition: 'Clear', humidity: 45, wind: 5, icon: '☀️', forecast: [{ day: 'Mon', high: 70, low: 58, icon: '☀️' }, { day: 'Tue', high: 65, low: 55, icon: '⛅' }, { day: 'Wed', high: 62, low: 52, icon: '🌧️' }, { day: 'Thu', high: 64, low: 54, icon: '⛅' }, { day: 'Fri', high: 68, low: 57, icon: '☀️' }], hourly: [] };
-const MOCK_SPORTS = { team: 'Dallas Cowboys', league: 'NFL', games: [{ id: '1', name: 'Cowboys vs Eagles', status: 'Live', statusDetail: 'Q4 2:15', isLive: true, isCompleted: false, home: { name: 'Eagles', abbreviation: 'PHI', score: '24', color: '#004C54', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png' }, away: { name: 'Cowboys', abbreviation: 'DAL', score: '27', color: '#041E42', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/dal.png' }, venue: 'AT&T Stadium', broadcast: 'FOX', league: 'NFL' }], stats: { wins: 10, losses: 3 } };
-const MOCK_STOCKS = { stock: { symbol: 'AAPL', name: 'Apple Inc.', price: 189.42, currency: 'USD', change: 1.24, changeAbs: 2.32, isUp: true, exchange: 'NASDAQ', marketState: 'Open', sparkline: [185, 186, 187, 186.5, 188, 187.5, 189, 189.42], high: 190.1, low: 186.8, volume: 52400000, fiftyTwoWeekHigh: 199.62, fiftyTwoWeekLow: 164.08 } };
-const MOCK_NEWS = { articles: [{ title: 'AI breakthroughs in 2026', link: '#', source: 'Tech News', date: '2h ago' }, { title: 'Global markets hit record highs', link: '#', source: 'Finance Daily', date: '4h ago' }] };
-const MOCK_MUSIC = { isPlaying: true, title: 'Blinding Lights', artist: 'The Weeknd', album: 'After Hours', albumArt: 'https://upload.wikimedia.org/wikipedia/en/e/e6/The_Weeknd_-_Blinding_Lights.png' };
-const MOCK_CURRENCY = { from: 'USD', to: 'EUR', amount: 100, result: 92.4, rate: 0.924 };
-const MOCK_SYSTEM = { cpu: 24, ram: 45, disk: 60 };
+const MOCK_WEATHER = {
+  location: 'Chicago, Illinois',
+  temperature: '68°F',
+  condition: 'Partly Cloudy',
+  high: '72°F',
+  low: '56°F',
+  humidity: '52%',
+  wind: '11 mph',
+  hourly: [
+    { time: 'Now', temp: '68°' },
+    { time: '+1h', temp: '70°' },
+    { time: '+2h', temp: '71°' },
+    { time: '+3h', temp: '69°' },
+    { time: '+4h', temp: '66°' },
+  ]
+};
+const MOCK_SPORTS = {
+  team: 'Los Angeles Lakers',
+  league: 'NBA',
+  games: [
+    {
+      id: '1', name: 'Mavericks at Lakers', status: 'Final', statusDetail: 'Final', isLive: false, isCompleted: true,
+      home: { name: 'Los Angeles Lakers', abbreviation: 'LAL', score: '114', color: '#552583', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/lal.png', record: '48-34' },
+      away: { name: 'Dallas Mavericks', abbreviation: 'DAL', score: '109', color: '#00538C', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/dal.png', record: '50-32' },
+      venue: 'Crypto.com Arena', broadcast: 'ESPN', league: 'NBA'
+    }
+  ]
+};
+const MOCK_STOCKS = {
+  stock: {
+    symbol: 'NVDA', name: 'NVIDIA Corporation', price: 138.60, currency: 'USD', change: 3.42, changeAbs: 4.58, isUp: true,
+    exchange: 'NASDAQ', marketState: 'REGULAR', sparkline: [131, 132.5, 134, 133.2, 135.8, 137.1, 138.6],
+    high: 139.40, low: 133.10, volume: 64200000, fiftyTwoWeekHigh: 149.76, fiftyTwoWeekLow: 75.60,
+    logoUrl: 'https://financialmodelingprep.com/image-stock/NVDA.png',
+    sector: 'Technology', industry: 'Semiconductors', marketCap: '$3.39T'
+  }
+};
+const MOCK_NEWS = {
+  topic: 'Technology',
+  articles: [
+    { title: 'Next-Gen Local AI Models Run Faster Than Ever on Consumer GPUs', link: 'https://news.google.com', source: 'The Verge', date: '1h ago', snippet: 'New quantization breakthroughs allow 8B and 14B models to stream instantaneously on 8GB VRAM cards.', faviconUrl: 'https://www.google.com/s2/favicons?domain=theverge.com&sz=128' },
+    { title: 'Open-Source Desktop Assistants Lead the 2026 Developer Wave', link: 'https://news.google.com', source: 'Ars Technica', date: '3h ago', snippet: 'Local-first privacy and native OS widgets are replacing browser-only chat tabs.', faviconUrl: 'https://www.google.com/s2/favicons?domain=arstechnica.com&sz=128' }
+  ]
+};
+const MOCK_MUSIC = { isPreview: true, isPlaying: true, title: 'Designer', artist: 'Balu Brigada', album: 'Spotify', albumArt: '' };
+const MOCK_CURRENCY = { from: 'USD', to: 'EUR', amount: 100, converted: 92.40, rate: 0.9240 };
+const MOCK_SYSTEM = {
+  isPreview: true,
+  cpuPercent: 18, cpuCores: 16, cpuModel: 'Windows x64 Processor',
+  memPercent: 48, usedMemGB: 7.7, totalMemGB: 16.0, diskFreeGB: 215.4, uptimeHours: 6.5, ollamaOnline: true
+};
+const MOCK_HEALTH = {
+  isPreview: true,
+  engine: 'online', models: { tools: true, chat: true },
+  cpu: 18, mem: 48, memUsedGB: 7.7, memTotalGB: 16.0, diskFreeGB: 215.4
+};
+const MOCK_TRANSLATION = {
+  sourceText: 'Good morning, how are you?',
+  targetLanguage: 'Spanish and Japanese',
+  translations: [
+    { language: 'Spanish', translatedText: 'Buenos días, ¿cómo estás?' },
+    { language: 'Japanese', translatedText: 'おはようございます、お元気ですか？', pronunciation: 'Ohayōgozaimasu, ogenkidesuka?' }
+  ]
+};
 
 export default Settings;

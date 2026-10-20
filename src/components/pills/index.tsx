@@ -46,11 +46,11 @@ export const PILL_REGISTRY: PillEntry[] = [
   { ...directionsPillMeta, component: DirectionsPill },
   { ...notificationPillMeta, component: NotificationPill },
   { ...clockPillMeta, component: ClockPill },
+  { ...systemPillMeta, component: SystemPill },
   { ...connectivityPillMeta, component: ConnectivityPill },
   { ...tasksPillMeta, component: TasksPill },
   { ...currencyPillMeta, component: CurrencyPill },
   { ...calculatorPillMeta, component: CalculatorPill },
-  { ...systemPillMeta, component: SystemPill },
   { ...translationPillMeta, component: TranslationPill },
   { ...calendarPillMeta, component: CalendarPill },
 ];
@@ -78,3 +78,9 @@ export { CalculatorPill } from './CalculatorPill';
 export { SystemPill } from './SystemPill';
 export { TranslationPill } from './TranslationPill';
 export { CalendarPill } from './CalendarPill';
+export { TasksPill } from './TasksPill';
+export { TimerPill } from './TimerPill';
+export { RecordingPill } from './RecordingPill';
+export { DirectionsPill } from './DirectionsPill';
+export { NotificationPill } from './NotificationPill';
+export { ClockPill } from './ClockPill';

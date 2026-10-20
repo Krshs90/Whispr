@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Maximize2, Minimize2, X, Check, Copy, AudioLines, Send, Square } from 'lucide-react';
+import { Search, Maximize2, Minimize2, X, Check, Copy, AudioLines, Send, Square, ImagePlus } from 'lucide-react';
 import MarkdownRenderer from '../MarkdownRenderer';
 import { useIslandState } from '../../context/IslandContext';
 import { estimateContextMemory } from '../../lib/sessionStore';
@@ -34,6 +34,29 @@ export function ResponseView() {
   const activeSession = sessions.find(s => s.id === activeChatId);
   const memoryTokens = estimateContextMemory(activeSession);
   const maxTokens = 4096;
+
+  // Auto-expand for graph responses on arrival unless user has collapsed it
+  const hasAutoExpandedGraphRef = useRef<string | null>(null);
+  useEffect(() => {
+    const lastMsg = activeSession?.messages?.[activeSession.messages.length - 1];
+    if (lastMsg?.role === 'assistant' && lastMsg.content?.includes('```graph')) {
+      if (hasAutoExpandedGraphRef.current !== lastMsg.id) {
+        hasAutoExpandedGraphRef.current = lastMsg.id;
+        setIsExpanded(true);
+        window.electronAPI?.resizeOverlay(true);
+      }
+    }
+  }, [activeSession?.messages, setIsExpanded]);
+
+  const handleNewSession = () => {
+    setIsExpanded(false);
+    window.electronAPI?.resizeOverlay(false);
+    setActiveChatId('');
+    activeChatIdRef.current = '';
+    localStorage.removeItem('whispr_active_chat');
+    setActiveView('-1');
+    setPhase('dynamic');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +121,9 @@ export function ResponseView() {
       userData: {
         name: localStorage.getItem('whispr_user_name') || '',
         context: localStorage.getItem('whispr_user_context') || '',
+        musicPlatform: localStorage.getItem('whispr_music_platform') || 'spotify',
         visionEnabled: localStorage.getItem('whispr_vision_enabled') !== 'false',
+        controlEnabled: localStorage.getItem('whispr_control_enabled') !== 'false',
         allowedMonitors: localStorage.getItem('whispr_allowed_monitors') || '[]'
       }
     });
@@ -143,9 +168,11 @@ export function ResponseView() {
       </div>
 
       <div style={{ flex: 1, padding: 20, paddingTop: 10, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {activeSession?.messages.map(msg => (
-          <div key={msg.id} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', background: msg.role === 'user' ? '#31312F' : 'transparent', padding: '10px 14px', borderRadius: 16, border: msg.role === 'user' ? 'none' : '1px solid #2A2A2A', maxWidth: '90%', fontSize: 13.5, color: '#FFFFEB', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+        {activeSession?.messages.map(msg => {
+          const isGraphMsg = msg.role === 'assistant' && Boolean(msg.content?.includes('```graph'));
+          return (
+          <div key={msg.id} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', background: msg.role === 'user' ? '#31312F' : 'transparent', padding: isGraphMsg ? '8px 10px' : '10px 14px', borderRadius: 16, border: msg.role === 'user' ? 'none' : '1px solid #2A2A2A', width: isGraphMsg ? '100%' : undefined, maxWidth: isGraphMsg ? '100%' : '90%', boxSizing: 'border-box', fontSize: 13.5, color: '#FFFFEB', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', width: '100%' }}>
               <div style={{ position: 'relative', width: '100%' }}>
                 {msg.role === 'user' ? (
                   msg.content
@@ -184,7 +211,8 @@ export function ResponseView() {
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
         
         {/* Inline follow-up loading indicator */}
         {isFollowUpLoading && (
@@ -215,14 +243,24 @@ export function ResponseView() {
             </motion.div>
           )}
         </AnimatePresence>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', background: '#222', borderRadius: 20, border: '1px solid #2A2A2A', padding: '6px 8px 6px 16px', minWidth: 0 }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', background: '#222', borderRadius: 20, border: '1px solid #2A2A2A', padding: '6px 8px 6px 10px', minWidth: 0, gap: 6 }}>
+          <button
+            type="button"
+            onClick={() => console.log('[Whispr] Add image clicked')}
+            title="Add Image"
+            style={{ ...iconBtnStyle, width: 28, height: 28, border: 'none' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#31312F'; e.currentTarget.style.color = '#FFFFEB'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,235,0.5)'; }}
+          >
+            <ImagePlus size={15} />
+          </button>
           <input ref={inputRef} autoFocus type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Continue chat..." style={{ ...inputStyle, fontSize: 14, minWidth: 0 }} />
           <button type="button" onClick={() => isFollowUpLoading ? window.electronAPI?.stopChat() : handleSubmit(new Event('submit') as any)} style={{ ...iconBtnStyle, width: 32, height: 32, background: '#31312F', color: '#FFFFEB' }} title={isFollowUpLoading ? "Stop generation" : "Send"}>
             {isFollowUpLoading ? <Square size={13} fill="currentColor" /> : <Send size={15} />}
           </button>
         </form>
         <div style={{ display: 'flex', gap: 6, marginTop: 10, justifyContent: 'center' }}>
-          <button onClick={() => { setPhase('dynamic'); setActiveView('-1'); setActiveChatId(''); }} style={chipBtnStyle}>New Session</button>
+          <button onClick={handleNewSession} style={chipBtnStyle}>New Session</button>
           <button onClick={handleOpenMainApp} style={chipBtnStyle}>Open in Window</button>
         </div>
       </div>

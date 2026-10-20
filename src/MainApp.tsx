@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { WhisprErrorBoundary } from './components/ErrorBoundary';
-import { Send, Plus, Settings as SettingsIcon, Trash2, MessageSquare, ChevronLeft, Search, Globe, BookOpen, ExternalLink, Minus, Square, X, Copy, Check, Pin } from 'lucide-react';
+import { Send, Plus, Settings as SettingsIcon, Trash2, MessageSquare, ChevronLeft, Globe, BookOpen, ExternalLink, Minus, Square, X, Copy, Check, Pin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MarkdownRenderer from './components/MarkdownRenderer';
 import { WeatherPill } from './components/pills/WeatherPill';
@@ -15,12 +15,13 @@ import { CalculatorPill } from './components/pills/CalculatorPill';
 import { SystemPill } from './components/pills/SystemPill';
 import { TranslationPill } from './components/pills/TranslationPill';
 import { CalendarPill } from './components/pills/CalendarPill';
+import { TasksPill } from './components/pills/TasksPill';
+import { TimerPill } from './components/pills/TimerPill';
+import { normalizeToolToPillKey } from './hooks/useElectronIPC';
 import Settings from './Settings';
 import { useSharedSessions, estimateContextMemory, loadSessions } from './lib/sessionStore';
 import type { ChatMessage, ChatSession } from './lib/types';
 import { Onboarding } from './components/Onboarding';
-
-// electronAPI type is declared globally in App.tsx
 
 
 // Demo sessions with rich content
@@ -219,7 +220,7 @@ function MainApp() {
         
         // If the session doesn't exist, reload ALL sessions from localStorage 
         // (the Dynamic Bar already created and saved them there)
-        let base = sessionExists ? prev : loadSessions();
+        const base = sessionExists ? prev : loadSessions();
         
         return base.map(s => {
           if (s.id !== targetId) return s;
@@ -242,17 +243,18 @@ function MainApp() {
       if (!targetId) return;
       
       setActiveSessionId(targetId);
-      const keyword = toolData.toolName.replace('get_', '').replace('search_', '').replace('play_', '');
+      const searchKey = normalizeToolToPillKey(toolData.toolName);
+      if (!searchKey) return;
       setSessions(prev => {
         const sessionExists = prev.some(s => s.id === targetId);
-        let base = sessionExists ? prev : loadSessions();
+        const base = sessionExists ? prev : loadSessions();
         
         return base.map(s => {
           if (s.id !== targetId) return s;
           const newMessages = [...s.messages];
           const lastMsg = newMessages[newMessages.length - 1];
           if (lastMsg && lastMsg.role === 'assistant') {
-            lastMsg.pill = keyword;
+            lastMsg.pill = searchKey;
             lastMsg.pillData = toolData.args;
           }
           return { ...s, messages: newMessages };
@@ -274,19 +276,19 @@ function MainApp() {
       setSlowWarning(speedInfo);
     });
 
-    const cleanupToolResult = (api as any).onChatToolResult?.((resultData: { toolName: string, resultStr: string }) => {
-      const keyword = resultData.toolName.replace('get_', '').replace('search_', '').replace('play_', '');
-      const searchKey = keyword === 'check_system_health' ? 'health' : keyword;
+    const cleanupToolResult = api.onChatToolResult?.((resultData) => {
+      const searchKey = normalizeToolToPillKey(resultData.toolName);
+      if (!searchKey) return;
       
       const targetId = getLiveSessionId();
       if (!targetId) return;
 
       let parsedResult = {};
-      try { parsedResult = JSON.parse(resultData.resultStr); } catch (e) {}
+      try { parsedResult = JSON.parse(resultData.resultStr); } catch { /* ignore invalid json */ }
 
       setSessions(prev => {
         const sessionExists = prev.some(s => s.id === targetId);
-        let base = sessionExists ? prev : loadSessions();
+        const base = sessionExists ? prev : loadSessions();
         
         return base.map(s => {
           if (s.id !== targetId) return s;
@@ -308,7 +310,7 @@ function MainApp() {
       if (cleanupSystemHealth) cleanupSystemHealth();
       cleanupSlowWarning();
     };
-  }, [activeSessionId]);
+  }, [activeSessionId, setSessions]);
 
   // Sync isProcessing flag across windows specifically for transfer
   useEffect(() => {
@@ -447,7 +449,9 @@ function MainApp() {
       userData: {
         name: localStorage.getItem('whispr_user_name') || '',
         context: localStorage.getItem('whispr_user_context') || '',
+        musicPlatform: localStorage.getItem('whispr_music_platform') || 'spotify',
         visionEnabled: localStorage.getItem('whispr_vision_enabled') !== 'false',
+        controlEnabled: localStorage.getItem('whispr_control_enabled') !== 'false',
         allowedMonitors: localStorage.getItem('whispr_allowed_monitors') || '[]'
       }
     });
@@ -455,7 +459,8 @@ function MainApp() {
 
   // Render dynamic pill based on type — uses registry lookup with fallback
   const renderPill = (type: string, data?: any) => {
-    if (data && data.error) return null;
+    if (!type || (data && data.error)) return null;
+    if (type === 'system' && data && data.command) return null;
 
     const pillCard: React.CSSProperties = { 
       marginTop: 10, 
@@ -471,22 +476,25 @@ function MainApp() {
       case 'sports': return <div style={{ ...pillCard, minHeight: 280 }}><SportsPill data={data} defaultExpanded={true} /></div>;
       case 'music': return <div style={{ ...pillCard, minHeight: 380 }}><MusicPill data={data} defaultExpanded={true} /></div>;
       case 'stocks': return <div style={{ ...pillCard, minHeight: 280 }}><StocksPill data={data} defaultExpanded={true} /></div>;
-      case 'news': return <div style={{ ...pillCard, minHeight: 280 }}><NewsPill data={data} defaultExpanded={true} /></div>;
-      case 'flight': return <div style={{ ...pillCard, minHeight: 280 }}><FlightPill /></div>;
+      case 'news': return <div style={{ ...pillCard, minHeight: 320 }}><NewsPill data={data} defaultExpanded={true} /></div>;
+      case 'flight':
+      case 'flights': return <div style={{ ...pillCard, minHeight: 280 }}><FlightPill /></div>;
+      case 'timer':
+      case 'set_timer': return <div style={{ ...pillCard, minHeight: 138 }}><TimerPill data={data} /></div>;
       case 'currency':
       case 'get_currency': return <div style={{ ...pillCard, minHeight: 160 }}><CurrencyPill data={data} defaultExpanded={true} /></div>;
       case 'calculator':
       case 'open_calculator': return <div style={{ ...pillCard, minHeight: 420 }}><CalculatorPill defaultExpanded={true} /></div>;
       case 'translation':
-      case 'get_translation': return <div style={{ ...pillCard, minHeight: 340 }}><TranslationPill /></div>;
+      case 'get_translation': return <div style={{ ...pillCard, minHeight: 260 }}><TranslationPill data={data} /></div>;
       case 'calendar':
       case 'get_calendar': return <div style={{ ...pillCard, minHeight: 260 }}><CalendarPill /></div>;
       case 'tasks':
-      case 'get_tasks': return <div style={{ ...pillCard, minHeight: 280 }}><TasksPill data={data} defaultExpanded={true} /></div>;
+      case 'get_tasks': return <div style={{ ...pillCard, minHeight: 260 }}><TasksPill data={data} defaultExpanded={true} /></div>;
       case 'system':
       case 'get_system_stats': return <div style={{ ...pillCard, minHeight: 260 }}><SystemPill data={data} defaultExpanded={true} /></div>;
       case 'health': 
-      case 'check_system_health': return <div style={{ ...pillCard, minHeight: 280 }}><ConnectivityPill /></div>;
+      case 'check_system_health': return <div style={{ ...pillCard, minHeight: 280 }}><ConnectivityPill data={data} /></div>;
       default: return null;
     }
   };
@@ -558,18 +566,13 @@ function MainApp() {
         <div style={styles.sessionList}>
           <AnimatePresence>
             {pinnedSessions.length > 0 && (
-              <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ fontSize: 11, fontWeight: 600, color: '#888', padding: '12px 10px 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#888', padding: '12px 10px 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Pinned
-              </motion.div>
+              </div>
             )}
             {pinnedSessions.map(session => (
-              <motion.div
+              <div
                 key={session.id}
-                layout
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
                 onClick={() => {
                   localStorage.setItem('whispr_active_chat', session.id);
                   setActiveSessionId(session.id);
@@ -578,8 +581,16 @@ function MainApp() {
                   ...styles.sessionItem,
                   background: session.id === activeSessionId ? '#31312F' : 'transparent',
                 }}
-                onMouseEnter={(e) => e.currentTarget.querySelector('.session-actions')!.setAttribute('style', 'display: flex')}
-                onMouseLeave={(e) => e.currentTarget.querySelector('.session-actions')!.setAttribute('style', 'display: none')}
+                onMouseEnter={(e) => {
+                  if (session.id !== activeSessionId) e.currentTarget.style.background = '#242423';
+                  const el = e.currentTarget.querySelector('.session-actions') as HTMLElement | null;
+                  if (el) { el.style.opacity = '1'; el.style.pointerEvents = 'auto'; }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = session.id === activeSessionId ? '#31312F' : 'transparent';
+                  const el = e.currentTarget.querySelector('.session-actions') as HTMLElement | null;
+                  if (el) { el.style.opacity = '0'; el.style.pointerEvents = 'none'; }
+                }}
               >
                 <Pin size={14} style={{ flexShrink: 0, opacity: 0.8, color: '#4ADE80' }} />
                 <span style={styles.sessionTitle}>{session.title}</span>
@@ -587,22 +598,17 @@ function MainApp() {
                   <button onClick={(e) => { e.stopPropagation(); handleTogglePin(session.id); }} style={styles.deleteBtn} title="Unpin chat"><Pin size={13} fill="currentColor" /></button>
                   <button onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }} style={styles.deleteBtn} title="Delete chat"><Trash2 size={13} /></button>
                 </div>
-              </motion.div>
+              </div>
             ))}
 
             {recentSessions.length > 0 && (
-              <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ fontSize: 11, fontWeight: 600, color: '#888', padding: `${pinnedSessions.length > 0 ? 16 : 12}px 10px 4px`, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#888', padding: `${pinnedSessions.length > 0 ? 16 : 12}px 10px 4px`, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Recent
-              </motion.div>
+              </div>
             )}
             {recentSessions.map(session => (
-              <motion.div
+              <div
                 key={session.id}
-                layout
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
                 onClick={() => {
                   localStorage.setItem('whispr_active_chat', session.id);
                   setActiveSessionId(session.id);
@@ -611,8 +617,16 @@ function MainApp() {
                   ...styles.sessionItem,
                   background: session.id === activeSessionId ? '#31312F' : 'transparent',
                 }}
-                onMouseEnter={(e) => e.currentTarget.querySelector('.session-actions')!.setAttribute('style', 'display: flex')}
-                onMouseLeave={(e) => e.currentTarget.querySelector('.session-actions')!.setAttribute('style', 'display: none')}
+                onMouseEnter={(e) => {
+                  if (session.id !== activeSessionId) e.currentTarget.style.background = '#242423';
+                  const el = e.currentTarget.querySelector('.session-actions') as HTMLElement | null;
+                  if (el) { el.style.opacity = '1'; el.style.pointerEvents = 'auto'; }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = session.id === activeSessionId ? '#31312F' : 'transparent';
+                  const el = e.currentTarget.querySelector('.session-actions') as HTMLElement | null;
+                  if (el) { el.style.opacity = '0'; el.style.pointerEvents = 'none'; }
+                }}
               >
                 <MessageSquare size={14} style={{ flexShrink: 0, opacity: 0.5 }} />
                 <span style={styles.sessionTitle}>{session.title}</span>
@@ -620,7 +634,7 @@ function MainApp() {
                   <button onClick={(e) => { e.stopPropagation(); handleTogglePin(session.id); }} style={styles.deleteBtn} title="Pin chat"><Pin size={13} /></button>
                   <button onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }} style={styles.deleteBtn} title="Delete chat"><Trash2 size={13} /></button>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </AnimatePresence>
 
@@ -664,7 +678,7 @@ function MainApp() {
               <MessageSquare size={18} />
             </button>
           )}
-          <button onClick={() => setView('library')} style={{ ...styles.iconBtn, ...(view === 'library' ? styles.iconBtnActive : {}), WebkitAppRegion: 'no-drag' } as React.CSSProperties} title="Library">
+          <button onClick={() => { setSettingsTabOverride('widgets'); setShowSettings(true); }} style={{ ...styles.iconBtn, WebkitAppRegion: 'no-drag' } as React.CSSProperties} title="Widgets Library">
             <BookOpen size={18} />
           </button>
           <span style={styles.topBarTitle}>{activeSession?.title || 'Whispr'}</span>
@@ -707,17 +721,26 @@ function MainApp() {
             </div>
           )}
 
-          {activeSession?.messages.map(msg => (
-            <div key={msg.id} style={{ ...styles.messageBubble, alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+          {activeSession?.messages.map(msg => {
+            const isGraphMsg = msg.role === 'assistant' && Boolean(msg.content?.includes('```graph'));
+            return (
+            <div key={msg.id} style={{
+              ...styles.messageBubble,
+              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              width: isGraphMsg ? '100%' : undefined,
+              maxWidth: isGraphMsg ? 740 : '100%',
+            }}>
               <div style={{
                 ...styles.messageContent,
                 background: msg.role === 'user' ? '#31312F' : 'transparent',
                 border: msg.role === 'user' ? 'none' : '1px solid #2A2A2A',
-                maxWidth: msg.role === 'user' ? 480 : 680,
+                width: isGraphMsg ? '100%' : undefined,
+                maxWidth: msg.role === 'user' ? 480 : (isGraphMsg ? 740 : 680),
+                boxSizing: 'border-box',
               }}>
                 {/* Markdown rendered content */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                   <div style={{ position: 'relative' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: msg.role === 'user' ? 'flex-end' : 'stretch', width: '100%' }}>
+                   <div style={{ position: 'relative', width: '100%' }}>
                     {msg.role === 'user' ? (
                       msg.content 
                     ) : (
@@ -782,7 +805,8 @@ function MainApp() {
                 )}
               </div>
             </div>
-          ))}
+          );
+        })}
           <div ref={messagesEndRef} />
         </div>
 
@@ -840,10 +864,10 @@ const styles: Record<string, React.CSSProperties> = {
   logo: { fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: '#FFFFEB' },
   newChatBtn: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, border: '1px solid #2A2A2A', background: 'transparent', color: '#FFFFEB', fontSize: 14, cursor: 'pointer', marginBottom: 16, transition: 'background 0.2s' },
   sessionList: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 },
-  sessionItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', transition: 'background 0.15s', color: '#FFFFEB' },
-  sessionTitle: { flex: 1, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.85 },
-  actionRow: { display: 'none', alignItems: 'center', gap: 4 },
-  deleteBtn: { background: 'transparent', border: 'none', color: '#FFFFEB', opacity: 0.3, cursor: 'pointer', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' },
+  sessionItem: { display: 'flex', alignItems: 'center', gap: 10, height: 38, padding: '0 12px', boxSizing: 'border-box', borderRadius: 10, cursor: 'pointer', transition: 'background 0.15s', color: '#FFFFEB', flexShrink: 0 },
+  sessionTitle: { flex: 1, fontSize: 13, lineHeight: '18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.85 },
+  actionRow: { display: 'flex', alignItems: 'center', gap: 4, opacity: 0, pointerEvents: 'none', transition: 'opacity 0.15s ease', flexShrink: 0 },
+  deleteBtn: { background: 'transparent', border: 'none', color: '#FFFFEB', opacity: 0.5, cursor: 'pointer', padding: 3, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   sidebarFooter: { paddingTop: 12, borderTop: '1px solid #2A2A2A' },
   settingsBtn: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: 'none', background: 'transparent', color: '#FFFFEB', fontSize: 13, cursor: 'pointer', width: '100%', opacity: 0.7, transition: 'background 0.15s' },
   main: { flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0 },

@@ -29,22 +29,31 @@ const trainingData = [
   { text: "did the yankees win their baseball game", intent: "TOOL" },
   { text: "play some music", intent: "TOOL" },
   { text: "play jazz on spotify", intent: "TOOL" },
+  { text: "what song is playing right now", intent: "TOOL" },
   { text: "what is apples stock today", intent: "TOOL" },
   { text: "show me tsla stock price", intent: "TOOL" },
+  { text: "what is the current price of bitcoin", intent: "TOOL" },
+  { text: "check bitcoin ticker and price", intent: "TOOL" },
   { text: "what are the top headlines", intent: "TOOL" },
   { text: "breaking news", intent: "TOOL" },
+  { text: "top tech news today", intent: "TOOL" },
   { text: "how is nvidia stock doing", intent: "TOOL" },
   { text: "price of amzn", intent: "TOOL" },
   { text: "check the weather in new york", intent: "TOOL" },
+  { text: "set a timer for 5 minutes", intent: "TOOL" },
+  { text: "show my tasks", intent: "TOOL" },
+  { text: "add a task to buy groceries", intent: "TOOL" },
+  { text: "check my system health and ram usage", intent: "TOOL" },
   
   // CODE
-  { text: "how do I center a div", intent: "CODE" },
+  { text: "how do I center a div in css", intent: "CODE" },
   { text: "write a python script to parse xml", intent: "CODE" },
-  { text: "why is this javascript code throwing an error", intent: "CODE" },
-  { text: "explain react hooks", intent: "CODE" },
-  { text: "debug this function", intent: "CODE" },
-  { text: "how to use the fetch api", intent: "CODE" },
-  { text: "what is a closure", intent: "CODE" },
+  { text: "why is this javascript code throwing a typeerror", intent: "CODE" },
+  { text: "explain react useeffect and usestate hooks", intent: "CODE" },
+  { text: "debug this typescript function", intent: "CODE" },
+  { text: "how to use the fetch api in node", intent: "CODE" },
+  { text: "write a sql query to join two tables", intent: "CODE" },
+  { text: "implement binary search in python", intent: "CODE" },
   
   // MATH
   { text: "what is 54 times 23", intent: "MATH" },
@@ -60,6 +69,7 @@ const trainingData = [
   { text: "translate this to french", intent: "TRANSLATION" },
   { text: "what is thank you in japanese", intent: "TRANSLATION" },
   { text: "translate good morning into german", intent: "TRANSLATION" },
+  { text: "translate good morning how are you to spanish and japanese", intent: "TRANSLATION" },
   
   // HISTORY
   { text: "who was abraham lincoln", intent: "HISTORY" },
@@ -72,9 +82,20 @@ const trainingData = [
   { text: "what is the theory of relativity", intent: "SCIENCE" },
   { text: "why is the sky blue", intent: "SCIENCE" },
   { text: "what are black holes", intent: "SCIENCE" },
+  { text: "explain quantum computing in 2 sentences", intent: "SCIENCE" },
+  { text: "explain quantum mechanics and qubits", intent: "SCIENCE" },
+  { text: "how does dna replication work", intent: "SCIENCE" },
+  { text: "explain gravity and general relativity", intent: "SCIENCE" },
   
   // BUSINESS
   { text: "what is inflation", intent: "BUSINESS" },
+  { text: "what is bitcoin", intent: "BUSINESS" },
+  { text: "what is cryptocurrency", intent: "BUSINESS" },
+  { text: "how does bitcoin work", intent: "BUSINESS" },
+  { text: "what is blockchain technology", intent: "BUSINESS" },
+  { text: "what is ethereum", intent: "BUSINESS" },
+  { text: "explain cryptocurrency and bitcoin", intent: "BUSINESS" },
+  { text: "what is the stock market", intent: "BUSINESS" },
   { text: "explain the difference between stocks and bonds", intent: "BUSINESS" },
   { text: "how does a central bank work", intent: "BUSINESS" },
   { text: "what is a marketing funnel", intent: "BUSINESS" },
@@ -98,7 +119,9 @@ const trainingData = [
   { text: "tell me a joke", intent: "STANDARD" },
   { text: "who wrote harry potter", intent: "STANDARD" },
   { text: "what should i make for dinner", intent: "STANDARD" },
-  { text: "how do i bake a cake", intent: "STANDARD" }
+  { text: "how do i bake a cake", intent: "STANDARD" },
+  { text: "explain this concept in 2 sentences", intent: "STANDARD" },
+  { text: "summarize this for me briefly", intent: "STANDARD" }
 ];
 
 /**
@@ -123,9 +146,23 @@ function getClassifier() {
 
 /**
  * Classifies a user message using the custom trained ML model.
+ * Includes a guard against false-positive CODE classifications when no programming keywords exist.
  */
 export function classifyWithML(userMessage) {
   const classifier = getClassifier();
-  const prediction = classifier.classify(userMessage.toLowerCase());
+  const lower = userMessage.toLowerCase();
+  const prediction = classifier.classify(lower);
+
+  // Prevent general "explain X" queries from being misclassified as CODE
+  if (prediction === 'CODE') {
+    const codeKeywords = /\b(code|coding|script|function|class|method|variable|bug|debug|error|compile|runtime|javascript|typescript|python|java|rust|golang|c\+\+|html|css|react|vue|angular|node|sql|api|json|xml|regex|array|loop|algorithm|git|docker|terminal|bash|powershell)\b/i;
+    if (!codeKeywords.test(lower)) {
+      if (/\b(quantum|physics|chemistry|biology|atom|molecule|cell|planet|space|universe|relativity|energy|photon|electron|gravity)\b/i.test(lower)) {
+        return 'SCIENCE';
+      }
+      return 'STANDARD';
+    }
+  }
+
   return prediction;
 }

@@ -81,7 +81,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
   const handleStartDownloads = () => {
     // Filter out models that are already installed
-    let queue = Array.from(new Set([recommended.fast, recommended.heavy]));
+    const queue = Array.from(new Set([recommended.fast, recommended.heavy]));
     const toDownload = queue.filter(m => !installedModels.some(installed => installed.toLowerCase().startsWith(m.toLowerCase())));
     
     if (toDownload.length === 0) {
@@ -106,10 +106,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       }
       
       const target = toDownload[currentIdx];
-      let unlistenProgress: any;
-      let unlistenError: any;
 
-      unlistenProgress = window.electronAPI?.onPullProgress((data: any) => {
+      const unlistenProgress = window.electronAPI?.onPullProgress((data: any) => {
         if (data.status === 'success') {
           setCompletedDownloads(prev => new Set(prev).add(target));
           cleanup();
@@ -121,17 +119,17 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         }
       });
 
-      unlistenError = window.electronAPI?.onPullError((err: any) => {
+      const unlistenError = window.electronAPI?.onPullError((err: any) => {
         console.error("Download failed for", target, err);
         cleanup();
         currentIdx++;
         pullNext();
       });
 
-      const cleanup = () => {
+      function cleanup() {
         if (unlistenProgress) unlistenProgress();
         if (unlistenError) unlistenError();
-      };
+      }
 
       window.electronAPI?.pullModel(target);
     };

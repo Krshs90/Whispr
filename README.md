@@ -28,7 +28,7 @@ Whispr is a floating **Dynamic Island** for Windows that gives you instant AI ac
 
 Everything runs **100% locally** on your machine via [Ollama](https://ollama.ai). No API keys required for AI chat. No data leaves your machine.
 
-> **⚠️ Alpha Software** — Whispr is actively developed and has known bugs. See [Known Issues](#-known-issues) and check the [issue tracker](https://github.com/Krshs90/Whispr/issues) before reporting.
+> **🚀 Public Beta v0.1.0** — Whispr is under active development. See the [Roadmap & Issue Tracker](#-roadmap--issue-tracker) and check the [issue tracker](https://github.com/Krshs90/Whispr/issues) before reporting.
 
 <br/>
 
@@ -39,7 +39,9 @@ Everything runs **100% locally** on your machine via [Ollama](https://ollama.ai)
 - **Click-through architecture** — transparent areas pass clicks through to apps behind Whispr
 - **Pill stack carousel** — multiple widgets stack with 3D depth and vertical-swipe navigation
 - **Swipe-to-dismiss** — drag any widget left or right to close it
-- **Orb → pill morphing** — smooth animated transition sequence on activation
+- **Orb → pill morphing** — tuned spring physics and fluid blooming transition sequence on activation
+- **Shortcut stability & debounce** — robust key-hold tracking and anti-spam protection on `Ctrl+I`
+- **Image upload button** — attached media action bar prepared for multimodal vision analysis
 
 ### AI Chat Engine
 - **Fully local inference** via [Ollama](https://ollama.ai) — runs `llama3.2` by default, any model can be swapped in Settings
@@ -54,19 +56,19 @@ Everything runs **100% locally** on your machine via [Ollama](https://ollama.ai)
 |--------|--------|-------------|-------|
 | 🌤 **Weather** | ✅ Working | `wttr.in` (free) / OpenWeatherMap | Full 5-day + hourly |
 | 🏀 **Sports** | ✅ Working | ESPN public API | Scores, live, standings |
-| 📈 **Stocks** | ⚠️ Partial | Yahoo Finance scraping | Intermittently blocked by Yahoo |
+| 📈 **Stocks** | ✅ Working | Finnhub API + Yahoo fallback | Real-time tickers, crypto quotes, resilient auto-fallback |
 | 📰 **News** | ✅ Working | Google News RSS | Top headlines |
-| 🎵 **Music** | ✅ Working | Windows PowerShell / Native URIs | Detection + Playback via native apps/web |
-| 🧮 **Calculator** | ✅ Working | Local `mathjs` eval | Keyboard input, history, and graphing support |
-| 💱 **Currency** | ✅ Working | `fawazahmed0/currency-api` | No key needed |
-| 🖥 **System Monitor** | ⚠️ No CPU % | Node.js `os` module | Shows static CPU info, no live usage |
-| 🌍 **Translation** | 🔴 UI Shell | LLM only | No real translation API wired |
+| 🎵 **Music** | ✅ Working | Windows SMTC / Native URIs | Detection + Playback via native apps/web |
+| 🧮 **Calculator** | ✅ Working | Local `mathjs` eval | Keyboard input, history log, responsive UI, function graphing |
+| 💱 **Currency** | ✅ Working | `fawazahmed0/currency-api` | Real-time exchange rates, no key needed |
+| 🖥 **System Monitor** | ✅ Working | Node.js `os` + Ollama health | Live CPU %, RAM GB/total, disk space, Ollama engine status |
+| 🌍 **Translation** | ✅ Working | Google GTX / MyMemory | Quick language chips, animated dropdown, native script & phonetic guide |
 | 📅 **Calendar** | 🔴 Placeholder | None | No data source |
 | ✈️ **Flight** | 🔴 Placeholder | Hardcoded fake data | No API |
 | 🛜 **Connectivity** | ✅ Working | Native OS APIs + health monitor | WiFi + Ollama status |
-| ⏱ **Timer** | 🔴 UI Only | None | Buttons render but don't tick |
-| 🕐 **Clock** | ✅ Working | Local | Live |
-| ✅ **Tasks** | ⚠️ Local Only | `localStorage` | No sync, no AI-add support |
+| ⏱ **Timer** | ✅ Working | Reactive local timer | Countdown logic, interactive controls, quick presets & auto-start |
+| 🕐 **Clock** | ✅ Working | Local system time | Live interactive clock |
+| ✅ **Tasks** | ✅ Working | `localStorage` + AI integration | Local persistence, AI natural-language task creation & auto-completion |
 | 🔔 **Notifications** | 🔴 Placeholder | None | Static demo only |
 | 🧭 **Directions** | 🔴 Placeholder | None | Static demo only |
 
@@ -140,9 +142,9 @@ If the crash persists, please [open an issue](https://github.com/Krshs90/Whispr/
 
 Make sure Ollama is running: `ollama serve`. The default host is `http://127.0.0.1:11434`.
 
-**Stocks not loading**
+**Stocks & Crypto**
 
-Yahoo Finance scraping is intermittently blocked. This is a known issue. Adding a [Finnhub API key](https://finnhub.io) in **Settings → Services** provides a reliable fallback.
+Whispr features multi-layer market data routing: it queries the Finnhub API if configured in **Settings → Services**, and falls back to resilient Yahoo Finance market queries. Both US equities (e.g. `AAPL`, `NVDA`) and cryptocurrency pairs (e.g. `BTC-USD`, `ETH-USD`) are supported out of the box.
 
 <br/>
 
@@ -212,24 +214,31 @@ Quick summary:
 
 <br/>
 
-## ✦ Roadmap
+## ✦ Roadmap & Issue Tracker
 
-Top priorities for contributors:
+### Completed in v0.1.0 (Public Beta)
+- [x] **Fix Stocks widget** — multi-layer market data routing (Finnhub API + Yahoo Finance fallback for stocks & crypto)
+- [x] **Fix Calculator** — keyboard input, history tape, responsive layout, and math function graphing (`sin(x)`, `cos(x)`, polynomials)
+- [x] **Fix System Monitor** — live CPU usage %, RAM GB/total, disk space, and Ollama engine status
+- [x] **Implement Translation** — Google GTX / MyMemory fallback API, language quick chips, animated dropdown, native scripts & phonetics
+- [x] **Implement Timer** — countdown logic, interactive pause/resume/reset, quick presets & auto-start on prompt
+- [x] **Fix Music Playback** — Windows SMTC detection + native app & web launching for Spotify, Apple Music, and YouTube Music
+- [x] **Fix Dynamic Island Overlay** — `Ctrl+I` key-repeat/anti-spam debounce, smooth blooming orb transition sequence, floating pill state retention
+- [x] **Tasks AI integration** — natural language AI task creation and auto-completion support
 
-- [ ] Fix Stocks widget — replace Yahoo Finance scraping with reliable API
-- [x] Fix Calculator — add keyboard input, history, proper expression parser
-- [ ] Fix System Monitor — add live CPU %, GPU, network graphs
-- [ ] Implement Translation — wire MyMemory or LibreTranslate API
-- [ ] Implement Timer — countdown logic + desktop notification
-- [ ] Implement Whispr Vision — screen capture → vision model pipeline
-- [ ] Image upload — allow sending images to AI for analysis
-- [ ] Cross-platform media detection — replace Windows PowerShell
-- [x] Music Playback - Native desktop/web launching for Spotify, Apple Music, etc.
-- [ ] Production packaging — `electron-builder` installer
-- [ ] Replace DuckDuckGo HTML scraping — use SearXNG or Brave Search API
-- [ ] Dark/light theme — CSS custom properties system
-- [ ] Voice input — `whisper.cpp` STT integration
-- [ ] CI/CD — GitHub Actions for lint + type-check + build
+### Active Priorities & Upcoming Features
+- [ ] **Image Support** — upload & paste images for multimodal AI analysis (UI attachment button added)
+- [ ] **Fix Whispr Vision** — screen capture & multi-monitor vision analysis pipeline
+- [ ] **Fix Whispr Control** — Windows desktop automation, system controls (volume/mute), app launching & shortcuts
+- [ ] **Production packaging** — automated `electron-builder` Windows installer (`.exe`)
+- [ ] **Context window management** — long session token pruning and memory management
+- [ ] **Calendar integration** — Google Calendar / `.ics` URL support
+- [ ] **Flight tracking widget** — live flight API integration
+- [ ] **Cross-platform media detection** — replace Windows PowerShell with cross-platform native hooks
+- [ ] **Replace DuckDuckGo HTML scraping** — use SearXNG or Brave Search API
+- [ ] **Dark/light theme** — CSS custom properties system
+- [ ] **Voice input** — `whisper.cpp` STT integration
+- [ ] **CI/CD** — GitHub Actions for lint + type-check + build
 
 <br/>
 

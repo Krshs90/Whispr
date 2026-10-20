@@ -1,7 +1,7 @@
 {
   "name": "whisper-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -9,8 +9,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "electron:dev": "npm run clean:port && concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "clean:port": "node -e \"const {execSync}=require('child_process');try{const r=execSync('netstat -ano | findstr :5173 | findstr LISTENING',{encoding:'utf8'});const pids=[...new Set(r.split('\\n').map(l=>l.trim().split(/\\s+/).pop()).filter(Boolean))];pids.forEach(p=>{try{execSync('taskkill /PID '+p+' /F')}catch(e){}});console.log('Cleaned port 5173')}catch(e){console.log('Port 5173 is free')}\"",
+    "electron:dev": "npm run clean:port && concurrently -k \"vite\" \"wait-on http-get://127.0.0.1:5173 && node scripts/launch-electron.cjs\"",
+    "clean:port": "node -e \"const {execSync}=require('child_process');try{execSync('taskkill /IM electron.exe /F',{stdio:'ignore'})}catch(e){}try{const r=execSync('netstat -ano | findstr :5173 | findstr LISTENING',{encoding:'utf8'});const pids=[...new Set(r.split('\\n').map(l=>l.trim().split(/\\s+/).pop()).filter(Boolean))];pids.forEach(p=>{try{execSync('taskkill /PID '+p+' /F')}catch(e){}});console.log('Cleaned port 5173')}catch(e){console.log('Port 5173 is free')}\"",
     "test:ai": "node tests/orchestratorTest.js"
   },
   "dependencies": {

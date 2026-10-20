@@ -36,26 +36,41 @@ function getSmtcScript(action) {
 [CmdletBinding()]
 param([string]$action = "${action}")
 
-[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime] | Out-Null
-$managerTask = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
-$managerTask.AsTask().Wait()
-$manager = $managerTask.GetResults()
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1'
+})[0]
 
+function Await($WinRtTask, $ResultType) {
+    $asTask = $asTaskGeneric.MakeGenericMethod($ResultType)
+    $netTask = $asTask.Invoke($null, @($WinRtTask))
+    $netTask.Wait(-1) | Out-Null
+    $netTask.Result
+}
+
+[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime] | Out-Null
+[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties, Windows.Media.Control, ContentType = WindowsRuntime] | Out-Null
+
+$manager = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
 $session = $manager.GetCurrentSession()
+if (-not $session) {
+    $sessions = $manager.GetSessions()
+    if ($sessions -and $sessions.Count -gt 0) {
+        $session = $sessions[0]
+    }
+}
 if (-not $session) {
     @{ status = "idle" } | ConvertTo-Json -Compress
     exit
 }
 
-if ($action -eq "play") { $session.TryPlayAsync().AsTask().Wait() }
-if ($action -eq "pause") { $session.TryPauseAsync().AsTask().Wait() }
-if ($action -eq "next") { $session.TrySkipNextAsync().AsTask().Wait() }
-if ($action -eq "prev") { $session.TrySkipPreviousAsync().AsTask().Wait() }
+if ($action -eq "play") { Await ($session.TryPlayAsync()) ([bool]) | Out-Null }
+if ($action -eq "pause") { Await ($session.TryPauseAsync()) ([bool]) | Out-Null }
+if ($action -eq "playpause") { Await ($session.TryTogglePlayPauseAsync()) ([bool]) | Out-Null }
+if ($action -eq "next") { Await ($session.TrySkipNextAsync()) ([bool]) | Out-Null }
+if ($action -eq "prev") { Await ($session.TrySkipPreviousAsync()) ([bool]) | Out-Null }
 
-$mediaPropsTask = $session.TryGetMediaPropertiesAsync()
-$mediaPropsTask.AsTask().Wait()
-$props = $mediaPropsTask.GetResults()
-
+$props = Await ($session.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
 $timeline = $session.GetTimelineProperties()
 $playbackInfo = $session.GetPlaybackInfo()
 
@@ -68,7 +83,7 @@ if ($source -match "Spotify") { $source = "spotify" }
 elseif ($source -match "Chrome") { $source = "chrome" }
 elseif ($source -match "msedge") { $source = "msedge" }
 elseif ($source -match "Firefox") { $source = "firefox" }
-elseif ($source -match "iTunes") { $source = "itunes" }
+elseif ($source -match "iTunes|AppleMusic") { $source = "itunes" }
 
 $position = 0
 $endTime = 0
@@ -116,7 +131,7 @@ export async function controlMedia(action) {
 
 async function executeSmtcCommand(action) {
   try {
-    const ALLOWED_ACTIONS = ['status', 'play', 'pause', 'next', 'prev'];
+    const ALLOWED_ACTIONS = ['status', 'play', 'pause', 'playpause', 'next', 'prev'];
     if (!ALLOWED_ACTIONS.includes(action)) {
       throw new Error(`Unauthorized SMTC action: ${action}`);
     }

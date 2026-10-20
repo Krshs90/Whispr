@@ -1,5 +1,4 @@
 import { Bell, AlertCircle } from 'lucide-react';
-import { PillLayout } from './PillLayout';
 
 export function NotificationPill() {
   return (

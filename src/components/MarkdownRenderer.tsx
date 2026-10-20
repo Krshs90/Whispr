@@ -22,7 +22,6 @@ function preprocessLaTeX(text: string) {
   // Wrap raw \begin{...} ... \end{...} in $$ if not already
   // We also automatically translate align/align* to aligned because KaTeX does not support align natively in math blocks!
   processed = processed.replace(/\\begin\{(align\*?|equation|pmatrix|bmatrix|vmatrix|cases|eqnarray)\}([\s\S]*?)\\end\{\1\}/g, (match, env, inner) => {
-    let safeEnv = env;
     if (env === 'align' || env === 'align*') {
       return `\n\n$$\n\\begin{aligned}${inner}\\end{aligned}\n$$\n\n`;
     }
@@ -100,7 +99,7 @@ export default function MarkdownRenderer({ content }: MarkdownProps) {
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: '#FF8C00', strict: false }]]}
         components={{
-          a({ node, href, children, ...props }: any) {
+          a({ href, children, ...props }: any) {
             if (href?.startsWith('action:pullModel:')) {
               return (
                 <button
@@ -113,30 +112,35 @@ export default function MarkdownRenderer({ content }: MarkdownProps) {
             }
             return <a href={href} {...props}>{children}</a>;
           },
-          code({ node, inline, className, children, ...props }: any) {
+          code({ inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '');
             const codeString = String(children).replace(/\n$/, '');
             
             // ── Interactive graph rendering ──
-            if (!inline && match && match[1] === 'graph') {
+            if (match && match[1] === 'graph') {
               const functions = codeString.split('\n').map(l => l.trim()).filter(Boolean);
               return <MathGraph functions={functions} />;
             }
             
-            if (!inline && match) {
-              return <CodeBlock language={match[1]} code={codeString} />;
-            } else if (!inline) {
-               return <CodeBlock language="text" code={codeString} />;
+            // In react-markdown v9+, inline can be undefined.
+            // Fenced code blocks have a language class or contain newlines.
+            // Inline code (e.g. `setTimeout()`, `Date`) has no language class and no newlines.
+            const isBlock = Boolean(match) || (Boolean(className) && className.includes('language-')) || codeString.includes('\n') || inline === false;
+            
+            if (isBlock) {
+              return <CodeBlock language={match ? match[1] : 'text'} code={codeString} />;
             }
             return (
               <code style={{
-                background: '#444',
+                background: 'rgba(255, 255, 255, 0.08)',
                 padding: '2px 6px',
-                borderRadius: 4,
-                fontFamily: 'monospace',
+                borderRadius: 5,
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                 fontSize: 13,
                 color: '#4ADE80',
-                border: '1px solid #555'
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                display: 'inline',
+                wordBreak: 'break-word'
               }} {...props}>
                 {children}
               </code>

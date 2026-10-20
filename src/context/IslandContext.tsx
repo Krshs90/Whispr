@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import type { MutableRefObject } from 'react';
 import { useSharedSessions } from '../lib/sessionStore';
+import type { ChatSession } from '../lib/types';
 
 export type IslandPhase = 'idle' | 'orb' | 'processing' | 'response' | 'dynamic' | 'closing';
 
@@ -40,8 +41,8 @@ interface IslandContextType {
 
   // Actions
   dismiss: () => void;
-  sessions: any[];
-  updateSessions: any;
+  sessions: ChatSession[];
+  updateSessions: (updater: ChatSession[] | ((prev: ChatSession[]) => ChatSession[])) => void;
 }
 
 const IslandContext = createContext<IslandContextType | undefined>(undefined);
@@ -75,16 +76,17 @@ export function IslandProvider({ children }: { children: React.ReactNode }) {
 
   const dismiss = useCallback(() => {
     if (phase === 'idle' || phase === 'closing') return;
+    setIsExpanded(false);
     setPhase('closing');
   }, [phase]);
 
-  // Closing sequence
+  // Closing sequence: smoothly collapse to orb then unmount & hide
   useEffect(() => {
     if (phase === 'closing') {
       const timer = setTimeout(() => {
         setPhase('idle');
-        setTimeout(() => (window as any).electronAPI?.hideOverlay(), 350);
-      }, 450);
+        (window as any).electronAPI?.hideOverlay();
+      }, 360);
       return () => clearTimeout(timer);
     }
   }, [phase]);
@@ -107,13 +109,13 @@ export function IslandProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [phase, dismiss]);
 
-  // Auto-expand orb -> dynamic
+  // Auto-expand orb -> dynamic: give glowing orb time to bloom and breathe
   useEffect(() => {
     if (phase === 'orb') {
       const timer = setTimeout(() => {
         setPhase('dynamic');
         setActiveView('-1');
-      }, 400);
+      }, 360);
       return () => clearTimeout(timer);
     }
   }, [phase]);

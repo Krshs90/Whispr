@@ -8,6 +8,8 @@ interface NowPlayingData {
   artist: string;
   album: string;
   albumArt?: string;
+  position?: number;
+  duration?: number;
   source: { name: string; color: string; icon: string };
 }
 
@@ -28,26 +30,69 @@ function SourceIcon({ source, size = 14 }: { source: { name: string; color: stri
 
 export function MusicPill({ data, defaultExpanded = false, onExpand }: { data?: any; defaultExpanded?: boolean; onExpand?: (h: number) => void }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [playing, setPlaying] = useState(false);
-  const [nowPlaying, setNowPlaying] = useState<NowPlayingData | null>(null);
+  const initialNowPlaying: NowPlayingData | null = data?.now_playing?.title && data?.now_playing?.title !== 'Nothing Playing'
+    ? {
+        status: data.now_playing.isPlaying ? 'playing' : 'paused',
+        title: data.now_playing.title,
+        artist: data.now_playing.artist || '',
+        album: data.now_playing.album || '',
+        albumArt: data.now_playing.cover || data.now_playing.albumArt || '',
+        position: data.now_playing.position || 0,
+        duration: data.now_playing.duration || 0,
+        source: { name: data.now_playing.source || 'Spotify', color: '#1DB954', icon: (data.now_playing.source || 'spotify').toLowerCase() }
+      }
+    : null;
+  const [playing, setPlaying] = useState(initialNowPlaying ? initialNowPlaying.status === 'playing' : false);
+  const [nowPlaying, setNowPlaying] = useState<NowPlayingData | null>(initialNowPlaying);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Poll Windows Media Session every 2 seconds
   useEffect(() => {
+    if (data?.now_playing?.title && data?.now_playing?.title !== 'Nothing Playing') {
+      setNowPlaying({
+        status: data.now_playing.isPlaying ? 'playing' : 'paused',
+        title: data.now_playing.title,
+        artist: data.now_playing.artist || '',
+        album: data.now_playing.album || '',
+        albumArt: data.now_playing.cover || data.now_playing.albumArt || '',
+        position: data.now_playing.position || 0,
+        duration: data.now_playing.duration || 0,
+        source: { name: data.now_playing.source || 'Spotify', color: '#1DB954', icon: (data.now_playing.source || 'spotify').toLowerCase() }
+      });
+      setPlaying(Boolean(data.now_playing.isPlaying));
+    } else if (data?.title && data.title !== 'Nothing Playing') {
+      setNowPlaying({
+        status: data.isPlaying !== false ? 'playing' : 'paused',
+        title: data.title,
+        artist: data.artist || '',
+        album: data.album || '',
+        albumArt: data.albumArt || '',
+        position: 0,
+        duration: data.duration || 200,
+        source: { name: data.platform || 'Spotify', color: '#1DB954', icon: (data.platform || 'spotify').toLowerCase() }
+      });
+      setPlaying(data.isPlaying !== false);
+    }
+  }, [data]);
+
+  // Poll Windows Media Session every 2.5 seconds (unless in static Settings preview)
+  useEffect(() => {
+    if (data?.isPreview) return;
     const poll = async () => {
       try {
-        const result = await (window as any).electronAPI?.getNowPlaying();
+        const result = await window.electronAPI?.getNowPlaying();
         if (result) {
-          setNowPlaying(result);
-          setPlaying(result.status === 'playing');
+          setNowPlaying(prev => (result.title || !prev) ? result : prev);
+          if (result.title) {
+            setPlaying(result.status === 'playing');
+          }
         }
       } catch { /* ignore if not available */ }
     };
     
     poll(); // immediate
-    pollRef.current = setInterval(poll, 2000);
+    pollRef.current = setInterval(poll, 2500);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
+  }, [data?.isPreview]);
 
   // Only use live detection — ignore data.song to prevent "null" / fake titles, 
   // UNLESS nowPlaying is completely unavailable (like in the Settings mock view)
@@ -113,8 +158,8 @@ export function MusicPill({ data, defaultExpanded = false, onExpand }: { data?: 
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 20 }}>
             {Array.from({ length: 4 }).map((_, i) => (
               <motion.div key={i}
-                animate={{ height: [3, 8 + Math.random() * 8, 3] }}
-                transition={{ repeat: Infinity, duration: 0.4 + Math.random() * 0.4, delay: i * 0.1 }}
+                animate={{ height: [3, 8 + ((i * 5) % 8), 3] }}
+                transition={{ repeat: Infinity, duration: 0.4 + (i * 0.1), delay: i * 0.1 }}
                 style={{ width: 2, background: source.color, borderRadius: 1 }}
               />
             ))}
@@ -204,7 +249,7 @@ export function MusicPill({ data, defaultExpanded = false, onExpand }: { data?: 
       </div>
 
       {/* Timeline Bar */}
-      {isActive && nowPlaying && nowPlaying.duration > 0 && (
+      {isActive && nowPlaying && (nowPlaying.duration ?? 0) > 0 && (
         <div style={{ width: '100%', padding: '0 10px', marginTop: 4 }}>
           <div style={{ 
             width: '100%', height: 4, background: '#333', 
@@ -213,7 +258,7 @@ export function MusicPill({ data, defaultExpanded = false, onExpand }: { data?: 
             <div style={{ 
               position: 'absolute', top: 0, left: 0, bottom: 0, 
               background: source.color, 
-              width: `${Math.min(100, Math.max(0, (nowPlaying.position / nowPlaying.duration) * 100))}%`,
+              width: `${Math.min(100, Math.max(0, ((nowPlaying.position ?? 0) / (nowPlaying.duration ?? 1)) * 100))}%`,
               transition: 'width 1s linear'
             }} />
           </div>
@@ -221,8 +266,8 @@ export function MusicPill({ data, defaultExpanded = false, onExpand }: { data?: 
             display: 'flex', justifyContent: 'space-between', 
             fontSize: 10, color: '#888', marginTop: 4, fontWeight: 500 
           }}>
-            <span>{Math.floor(nowPlaying.position / 60)}:{(nowPlaying.position % 60).toString().padStart(2, '0')}</span>
-            <span>{Math.floor(nowPlaying.duration / 60)}:{(nowPlaying.duration % 60).toString().padStart(2, '0')}</span>
+            <span>{Math.floor((nowPlaying.position ?? 0) / 60)}:{((nowPlaying.position ?? 0) % 60).toString().padStart(2, '0')}</span>
+            <span>{Math.floor((nowPlaying.duration ?? 0) / 60)}:{((nowPlaying.duration ?? 0) % 60).toString().padStart(2, '0')}</span>
           </div>
         </div>
       )}
@@ -231,13 +276,16 @@ export function MusicPill({ data, defaultExpanded = false, onExpand }: { data?: 
       {isActive && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 4 }}>
           <button 
-            onClick={() => window.electronAPI?.chatRequest({ messages: [{ role: 'user', content: 'prev' }], defaultModel: 'llama3.2', apiKeys: {}, userData: {} })}
+            onClick={() => window.electronAPI?.mediaControl('prev')}
             style={{ background: 'transparent', border: 'none', color: '#FFF', cursor: 'pointer', opacity: 0.7 }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
           </button>
           <button 
-            onClick={() => window.electronAPI?.chatRequest({ messages: [{ role: 'user', content: isPlayingNow ? 'pause' : 'play' }], defaultModel: 'llama3.2', apiKeys: {}, userData: {} })}
+            onClick={() => {
+              setPlaying(!isPlayingNow);
+              window.electronAPI?.mediaControl('playpause');
+            }}
             style={{ 
               background: '#FFF', border: 'none', color: '#000', cursor: 'pointer', 
               width: 40, height: 40, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' 
@@ -250,7 +298,7 @@ export function MusicPill({ data, defaultExpanded = false, onExpand }: { data?: 
             )}
           </button>
           <button 
-            onClick={() => window.electronAPI?.chatRequest({ messages: [{ role: 'user', content: 'skip' }], defaultModel: 'llama3.2', apiKeys: {}, userData: {} })}
+            onClick={() => window.electronAPI?.mediaControl('next')}
             style={{ background: 'transparent', border: 'none', color: '#FFF', cursor: 'pointer', opacity: 0.7 }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>

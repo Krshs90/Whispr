@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Send, LayoutGrid } from 'lucide-react';
+import { Send, LayoutGrid, ImagePlus } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useIslandState } from '../../context/IslandContext';
 import type { ChatMessage } from '../../lib/types';
 
@@ -13,13 +14,10 @@ export function IslandInput() {
     setActiveChatId,
     activeChatIdRef,
     updateSessions,
-    sessions,
     inputRef,
     dismiss,
     activeView
   } = useIslandState();
-
-  const activeSession = sessions.find(s => s.id === activeChatId);
 
   // Auto-focus input
   useEffect(() => {
@@ -38,21 +36,20 @@ export function IslandInput() {
     const q = query.trim();
     setQuery('');
 
-    let sid: string;
-    let oldMsgs: ChatMessage[] = [];
+    const oldMsgs: ChatMessage[] = [];
 
     // Always create a fresh session for new queries from the core bar
-    sid = Date.now().toString();
+    const sid = Date.now().toString();
     setActiveChatId(sid);
     activeChatIdRef.current = sid;
     localStorage.setItem('whispr_active_chat', sid);
-    updateSessions((prev: any) => [{ id: sid, title: q.slice(0, 40), messages: [], updatedAt: new Date().toISOString() }, ...prev]);
+    updateSessions(prev => [{ id: sid, title: q.slice(0, 40), messages: [], updatedAt: new Date().toISOString() }, ...prev]);
 
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: q, timestamp: new Date().toISOString() };
     const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: '', timestamp: new Date().toISOString() };
 
-    updateSessions((prev: any) =>
-      prev.map((s: any) => s.id === sid ? { ...s, messages: [...s.messages, userMsg, aiMsg], updatedAt: new Date().toISOString() } : s)
+    updateSessions(prev =>
+      prev.map(s => s.id === sid ? { ...s, messages: [...s.messages, userMsg, aiMsg], updatedAt: new Date().toISOString() } : s)
     );
 
     window.electronAPI?.chatRequest({
@@ -75,7 +72,9 @@ export function IslandInput() {
       userData: {
         name: localStorage.getItem('whispr_user_name') || '',
         context: localStorage.getItem('whispr_user_context') || '',
+        musicPlatform: localStorage.getItem('whispr_music_platform') || 'spotify',
         visionEnabled: localStorage.getItem('whispr_vision_enabled') !== 'false',
+        controlEnabled: localStorage.getItem('whispr_control_enabled') !== 'false',
         allowedMonitors: localStorage.getItem('whispr_allowed_monitors') || '[]'
       }
     });
@@ -92,14 +91,32 @@ export function IslandInput() {
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-      <button onClick={handleOpenMainApp} title="Open Whispr" style={iconBtnStyle}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16, ease: 'easeOut' }}
+      style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', padding: '0 12px' }}
+    >
+      <button onClick={handleOpenMainApp} title="Open Whispr Dashboard" style={iconBtnStyle}
         onMouseEnter={e => { e.currentTarget.style.background = '#31312F'; e.currentTarget.style.color = '#FFFFEB'; }}
         onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,235,0.5)'; }}
       >
         <LayoutGrid size={16} />
       </button>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', flex: 1, height: '100%', marginLeft: 10 }}>
+      <button
+        type="button"
+        onClick={() => {
+          console.log('[Whispr] Add image clicked');
+        }}
+        title="Add Image"
+        style={{ ...iconBtnStyle, marginLeft: 6 }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#31312F'; e.currentTarget.style.color = '#FFFFEB'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,235,0.5)'; }}
+      >
+        <ImagePlus size={16} />
+      </button>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', flex: 1, height: '100%', marginLeft: 8 }}>
         <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)}
           placeholder="Ask Whispr..." style={inputStyle} />
         <button type="submit" style={iconBtnStyle}
@@ -109,7 +126,7 @@ export function IslandInput() {
           <Send size={16} />
         </button>
       </form>
-    </div>
+    </motion.div>
   );
 }
 

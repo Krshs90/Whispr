@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Clock, AlertCircle } from 'lucide-react';
+import { Clock, AlertCircle } from 'lucide-react';
 
 export function CalendarPill() {
   const [now, setNow] = useState(new Date());

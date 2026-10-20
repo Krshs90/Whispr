@@ -1,4 +1,3 @@
-import React from 'react';
 import { IslandProvider } from './context/IslandContext';
 import { DynamicIsland } from './components/island/DynamicIsland';
 import { useElectronIPC } from './hooks/useElectronIPC';

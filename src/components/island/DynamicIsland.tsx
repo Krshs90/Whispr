@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { PILL_REGISTRY } from '../pills';
@@ -9,8 +9,16 @@ import { ProcessingIndicator } from './ProcessingIndicator';
 import { ResponseView } from './ResponseView';
 
 const PILL_WIDTH = 480;
-const PILL_WIDTH_EXPANDED = 660;
+const PILL_WIDTH_EXPANDED = 700;
 const INPUT_HEIGHT = 56;
+
+function readAnimPrefs() {
+  return {
+    disableAll: localStorage.getItem('whispr_disable_all_anim') === 'true',
+    disableSpring: localStorage.getItem('whispr_disable_spring_physics') === 'true',
+    disablePillAnim: localStorage.getItem('whispr_disable_pill_transitions') === 'true',
+  };
+}
 
 export function DynamicIsland() {
   const {
@@ -23,6 +31,18 @@ export function DynamicIsland() {
   } = useIslandState();
 
   const [dynamicHeights, setDynamicHeights] = useState<Record<string, number>>({});
+  const [animPrefs, setAnimPrefs] = useState(readAnimPrefs);
+
+  // Sync animation preferences across windows & tabs immediately
+  useEffect(() => {
+    const syncPrefs = () => setAnimPrefs(readAnimPrefs());
+    window.addEventListener('storage', syncPrefs);
+    window.addEventListener('whispr-anim-prefs-changed', syncPrefs);
+    return () => {
+      window.removeEventListener('storage', syncPrefs);
+      window.removeEventListener('whispr-anim-prefs-changed', syncPrefs);
+    };
+  }, []);
 
   const handleDragEnd = (viewId: string, _e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const { offset, velocity } = info;
@@ -76,7 +96,7 @@ export function DynamicIsland() {
     if (id === '-1') {
       if (phase === 'orb' || phase === 'closing') return 56;
       if (phase === 'processing') return 120;
-      if (phase === 'response') return isExpanded ? 500 : 280;
+      if (phase === 'response') return isExpanded ? 580 : 280;
       return INPUT_HEIGHT;
     }
 
@@ -91,6 +111,16 @@ export function DynamicIsland() {
     return INPUT_HEIGHT;
   };
 
+  const getTransition = (isCore: boolean) => {
+    if (animPrefs.disableAll || (!isCore && animPrefs.disablePillAnim)) {
+      return { duration: 0 };
+    }
+    if (animPrefs.disableSpring) {
+      return { type: 'tween' as const, duration: 0.2, ease: 'easeOut' as const };
+    }
+    return { type: 'spring' as const, stiffness: 340, damping: 26, mass: 0.8 };
+  };
+
   return (
     <div style={{
       width: '100vw', height: '100vh',
@@ -101,10 +131,10 @@ export function DynamicIsland() {
         {phase !== 'idle' && getRotatedViews().map((viewId, index, arr) => {
           const stackItem = !viewId || viewId === '-1' ? null : pillStack.find(p => p.id === viewId);
           const isCalcPill = stackItem ? PILL_REGISTRY[stackItem.pillIdx]?.name === 'Calculator' : false;
-          const basePillW = isExpanded ? PILL_WIDTH_EXPANDED : PILL_WIDTH;
+          const isCore = viewId === '-1';
+          const basePillW = (isCore && phase === 'response' && isExpanded) ? PILL_WIDTH_EXPANDED : PILL_WIDTH;
           const w = (phase === 'orb' || phase === 'closing') ? 56 : (isCalcPill ? Math.max(380, basePillW) : basePillW);
           const h = getPillHeight(viewId);
-          const isCore = viewId === '-1';
           const distance = arr.length - 1 - index;
 
           if (!isCore && phase !== 'dynamic') return null;
@@ -118,7 +148,7 @@ export function DynamicIsland() {
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
               dragElastic={0.06}
               onDragEnd={(e, info) => handleDragEnd(viewId, e, info)}
-              initial={{ opacity: 0, y: 30, scale: 0.8 }}
+              initial={animPrefs.disableAll ? false : { opacity: 0, y: 24, scale: 0.85 }}
               animate={{
                 opacity: distance === 0 ? 1 : Math.max(0, 0.6 - distance * 0.2),
                 y: distance === 0 ? 0 : (distance * -18) - 10,
@@ -126,8 +156,8 @@ export function DynamicIsland() {
                 width: w,
                 height: h
               }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 28, mass: 0.8 }}
+              exit={animPrefs.disableAll ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.85 }}
+              transition={getTransition(isCore)}
               style={{
                 background: '#1A1A1A',
                 borderRadius: 28,
@@ -148,8 +178,8 @@ export function DynamicIsland() {
               }}
             >
               {isCore ? (
-                <div style={{ width: '100%', height: '100%' }}>
-                  <AnimatePresence mode="wait">
+                <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                  <AnimatePresence>
                     {phase === 'orb' || phase === 'closing' ? <OrbIndicator key="orb" /> : null}
                     {phase === 'processing' ? <ProcessingIndicator key="processing" /> : null}
                     {phase === 'response' ? <ResponseView key="response" /> : null}

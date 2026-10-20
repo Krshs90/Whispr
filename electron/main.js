@@ -6,17 +6,14 @@ import fs from 'fs';
 import { ensureOllamaRunning, getAvailableModels } from './ai/ollamaManager.js';
 import { processChatStream, abortChatStream } from './ai/llm.js';
 import { startHealthMonitor } from './ai/health.js';
-import { detectNowPlaying } from './ai/mediaDetector.js';
+import { detectNowPlaying, controlMedia } from './ai/mediaDetector.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Prevent GPU process crashes on Windows by disabling hardware acceleration
+// Prevent renderer sandbox process crashes on Windows while keeping DWM transparency compositing enabled
 app.commandLine.appendSwitch('disable-gpu-sandbox');
-app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('no-sandbox');
-app.disableHardwareAcceleration();
 
 // ═══ PRODUCTION SAFETY: Global error handlers ═══
 // Prevent the entire Electron process from crashing on unhandled errors
@@ -73,7 +70,7 @@ function createOverlayWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
     },
   });
 
@@ -84,18 +81,35 @@ function createOverlayWindow() {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           isDev
-            ? "default-src 'self' http://localhost:5173; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5173; style-src 'self' 'unsafe-inline' http://localhost:5173; img-src 'self' data: https: http:; connect-src 'self' ws://localhost:5173 http://localhost:5173 http://127.0.0.1:11434 https:; font-src 'self' data: https:;"
-            : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self' http://127.0.0.1:11434 https:; font-src 'self' data: https:;"
+            ? "default-src 'self' http://127.0.0.1:5173 http://localhost:5173 https://www.desmos.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:5173 http://localhost:5173 https://www.desmos.com blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' http://127.0.0.1:5173 http://localhost:5173 https://www.desmos.com; img-src 'self' data: https: http: blob:; connect-src 'self' ws://127.0.0.1:5173 ws://localhost:5173 http://127.0.0.1:5173 http://localhost:5173 http://127.0.0.1:11434 https:; font-src 'self' data: https:;"
+            : "default-src 'self' https://www.desmos.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.desmos.com blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://www.desmos.com; img-src 'self' data: https: http: blob:; connect-src 'self' http://127.0.0.1:11434 https:; font-src 'self' data: https:;"
         ]
       }
     });
   });
 
   if (isDev) {
-    overlayWindow.loadURL('http://localhost:5173');
+    overlayWindow.loadURL('http://127.0.0.1:5173');
   } else {
     overlayWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  overlayWindow.webContents.once('did-finish-load', () => {
+    console.log('[Whispr] Overlay window finished loading — summoning Dynamic Island...');
+    // Automatically show the Dynamic Island on startup so the user immediately sees it
+    setTimeout(() => {
+      if (overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.isVisible()) {
+        toggleOverlay();
+      }
+    }, 600);
+  });
+
+  overlayWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error(`[Whispr] Overlay window failed to load: ${errorCode} ${errorDescription} — retrying in 500ms...`);
+    if (isDev && overlayWindow && !overlayWindow.isDestroyed()) {
+      setTimeout(() => overlayWindow?.loadURL('http://127.0.0.1:5173'), 500);
+    }
+  });
 
   // Make the window click-through by default, but allow hover detection
   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
@@ -122,12 +136,14 @@ function createMainWindow() {
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#1A1A1A',
-    show: false,
+    show: true,
+    center: true,
+    alwaysOnTop: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
       backgroundThrottling: false,
       devTools: isDev
     },
@@ -140,19 +156,28 @@ function createMainWindow() {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           isDev
-            ? "default-src 'self' http://localhost:5173; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5173; style-src 'self' 'unsafe-inline' http://localhost:5173; img-src 'self' data: https: http:; connect-src 'self' ws://localhost:5173 http://localhost:5173 http://127.0.0.1:11434 https:; font-src 'self' data: https:;"
-            : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self' http://127.0.0.1:11434 https:; font-src 'self' data: https:;"
+            ? "default-src 'self' http://127.0.0.1:5173 http://localhost:5173 https://www.desmos.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:5173 http://localhost:5173 https://www.desmos.com blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' http://127.0.0.1:5173 http://localhost:5173 https://www.desmos.com; img-src 'self' data: https: http: blob:; connect-src 'self' ws://127.0.0.1:5173 ws://localhost:5173 http://127.0.0.1:5173 http://localhost:5173 http://127.0.0.1:11434 https:; font-src 'self' data: https:;"
+            : "default-src 'self' https://www.desmos.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.desmos.com blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://www.desmos.com; img-src 'self' data: https: http: blob:; connect-src 'self' http://127.0.0.1:11434 https:; font-src 'self' data: https:;"
         ]
       }
     });
   });
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173?mode=main');
+    mainWindow.loadURL('http://127.0.0.1:5173?mode=main');
   } else {
     // For production, we'd load the built HTML with query param
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'), { query: { mode: 'main' } });
   }
+
+  mainWindow.webContents.once('did-finish-load', () => {
+    console.log('[Whispr] Main window finished loading.');
+    if (mainWindow && !mainWindow.isDestroyed() && !process.argv.includes('--hidden')) {
+      mainWindow.show();
+      mainWindow.moveTop();
+      mainWindow.focus();
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -180,7 +205,10 @@ function createMainWindow() {
   });
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.error(`[Whispr] Main window failed to load: ${errorCode} ${errorDescription}`);
+    console.error(`[Whispr] Main window failed to load: ${errorCode} ${errorDescription} — retrying in 500ms...`);
+    if (isDev && mainWindow && !mainWindow.isDestroyed()) {
+      setTimeout(() => mainWindow?.loadURL('http://127.0.0.1:5173?mode=main'), 500);
+    }
   });
 
   // Security: Stop all native navigations and new windows
@@ -197,17 +225,48 @@ function createMainWindow() {
   });
 }
 
-function toggleOverlay() {
-  if (!overlayWindow) return;
+let isOverlayOpen = false;
+let isKeyHeld = false;
+let lastRepeatTimestamp = 0;
+const KEY_REPEAT_THRESHOLD_MS = 280; // Windows keyboard repeat interval is ~30-50ms
+let overlayHideTimeout = null;
 
-  if (overlayWindow.isVisible()) {
+function toggleOverlay() {
+  const now = Date.now();
+
+  // If a shortcut trigger arrives within 280ms of the previous trigger, it is a keyboard-repeat event from holding the key down!
+  if (isKeyHeld && (now - lastRepeatTimestamp < KEY_REPEAT_THRESHOLD_MS)) {
+    lastRepeatTimestamp = now;
+    // DROP the repeat event! Do NOT toggle back and forth!
+    return;
+  }
+
+  isKeyHeld = true;
+  lastRepeatTimestamp = now;
+
+  console.log('[Whispr] toggleOverlay() triggered cleanly!');
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+
+  if (isOverlayOpen) {
+    // User wants to close the island
+    isOverlayOpen = false;
     overlayWindow.webContents.send('hide-island');
-    // Give the full closing animation time to play (pill->orb->slide down)
-    setTimeout(() => {
-      if (overlayWindow) overlayWindow.hide();
-    }, 900);
+
+    if (overlayHideTimeout) clearTimeout(overlayHideTimeout);
+    overlayHideTimeout = setTimeout(() => {
+      if (overlayWindow && !overlayWindow.isDestroyed() && !isOverlayOpen) {
+        overlayWindow.hide();
+      }
+      overlayHideTimeout = null;
+    }, 450);
   } else {
-    // Reposition to bottom center before showing
+    // User wants to open the island
+    isOverlayOpen = true;
+    if (overlayHideTimeout) {
+      clearTimeout(overlayHideTimeout);
+      overlayHideTimeout = null;
+    }
+
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
     const winWidth = 720;
@@ -216,6 +275,7 @@ function toggleOverlay() {
       Math.round(screenWidth / 2 - winWidth / 2),
       Math.max(primaryDisplay.workArea.y, screenHeight - winHeight)
     );
+    overlayWindow.setAlwaysOnTop(true, 'screen-saver');
     overlayWindow.show();
     overlayWindow.focus();
     overlayWindow.webContents.send('show-island');
@@ -225,12 +285,15 @@ function toggleOverlay() {
 // Single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
+  console.log('[Whispr] Another instance is already running — focusing existing window and exiting.');
   app.quit();
 } else {
   app.on('second-instance', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show();
       mainWindow.focus();
+    } else {
+      createMainWindow();
     }
   });
 
@@ -239,27 +302,52 @@ if (!gotTheLock) {
     await ensureOllamaRunning();
     
     createOverlayWindow();
-    createMainWindow(); // We create it but don't show it immediately!
+    createMainWindow();
     
     // Start Background Diagnostics Engine
     startHealthMonitor(mainWindow, overlayWindow);
 
     // Register Global Shortcut
     const config = getConfig();
-    const formattedInitialShortcut = config.shortcut.replace('Win', 'Super').replace('Ctrl', 'CommandOrControl').replace(/\s+/g, '');
+    const formattedInitialShortcut = (config.shortcut || 'CommandOrControl+I')
+      .replace('Win', 'Super')
+      .replace('Ctrl', 'CommandOrControl')
+      .replace(/\s+/g, '');
     const registered = globalShortcut.register(formattedInitialShortcut, () => {
       toggleOverlay();
     });
 
-    if (!registered) {
-      console.error(`Failed to register global shortcut ${formattedInitialShortcut}`);
+    if (registered) {
+      console.log(`[Whispr] Global shortcut registered: ${formattedInitialShortcut}`);
+    } else {
+      console.error(`[Whispr] Failed to register global shortcut ${formattedInitialShortcut}`);
+    }
+
+    // Also register Alt+Space as an always-available secondary shortcut
+    if (formattedInitialShortcut.toLowerCase() !== 'alt+space') {
+      const altRegistered = globalShortcut.register('Alt+Space', () => {
+        toggleOverlay();
+      });
+      if (altRegistered) {
+        console.log('[Whispr] Secondary global shortcut registered: Alt+Space');
+      }
     }
 
     // IPC: renderer requests to hide the overlay
     ipcMain.on('hide-overlay', () => {
-      if (overlayWindow && overlayWindow.isVisible()) {
+      if (overlayHideTimeout) {
+        clearTimeout(overlayHideTimeout);
+        overlayHideTimeout = null;
+      }
+      isOverlayOpen = false;
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
         overlayWindow.hide();
       }
+    });
+
+    // IPC: physical shortcut key released by user
+    ipcMain.on('shortcut-released', () => {
+      isKeyHeld = false;
     });
 
     // IPC: dynamic hitboxes
@@ -499,15 +587,25 @@ if (!gotTheLock) {
 
     ipcMain.handle('media-control', async (event, action) => {
       // Security: Only allow whitelisted media control actions
-      const ALLOWED_ACTIONS = ['playpause', 'next', 'prev'];
+      const ALLOWED_ACTIONS = ['playpause', 'play', 'pause', 'next', 'prev'];
       if (!ALLOWED_ACTIONS.includes(action)) {
         console.warn(`[Security] Blocked unauthorized media-control action: ${action}`);
         return false;
       }
 
       try {
+        // First try WinRT GlobalSystemMediaTransportControls (SMTC)
+        const smtcResult = await controlMedia(action);
+        if (smtcResult && smtcResult.status !== 'idle') {
+          return true;
+        }
+      } catch { /* fallback to sendkeys */ }
+
+      try {
         const KEYCODE_MAP = {
           'playpause': '[char]179',
+          'play': '[char]179',
+          'pause': '[char]179',
           'next': '[char]176',
           'prev': '[char]177',
         };
@@ -525,7 +623,7 @@ if (!gotTheLock) {
           ]);
         }
         return true;
-      } catch (e) {
+      } catch {
         return false;
       }
     });
@@ -535,7 +633,7 @@ if (!gotTheLock) {
       'get_weather', 'search_web', 'play_music', 'get_sports', 'get_stocks',
       'get_news', 'check_system_health', 'get_system_stats', 'get_currency',
       'get_translation', 'open_calculator', 'get_calendar', 'get_flights',
-      'get_tasks', 'get_location'
+      'get_tasks', 'get_location', 'set_timer', 'whispr_control'
     ];
 
     ipcMain.handle('execute-tool', async (event, name, args, apiKeys) => {

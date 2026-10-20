@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('window-blur', handler);
   },
   hideOverlay: () => ipcRenderer.send('hide-overlay'),
+  shortcutReleased: () => ipcRenderer.send('shortcut-released'),
   setIgnoreMouseEvents: (ignore, options) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),
 
   // AI API
@@ -94,6 +95,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('pull-model-error', handler);
     return () => ipcRenderer.removeListener('pull-model-error', handler);
   },
-  updateShortcut: (shortcut) => ipcRenderer.send('update-shortcut', shortcut),
   getMonitors: () => ipcRenderer.invoke('get-monitors')
 });
