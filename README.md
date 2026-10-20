@@ -2,7 +2,7 @@
 
 <br/>
 
-<img src="public/favicon.svg" width="72" height="72" alt="Whispr logo" />
+<img src="public/logo.png" width="96" height="96" alt="Whispr logo" style="border-radius: 20px;" />
 
 <h1>Whispr</h1>
 
